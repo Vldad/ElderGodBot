@@ -6,10 +6,10 @@ USE nosgoth_egb;
 
 -- Step 1: Create User
 -- MANUAL STEP: Replace 'your_password_here' with your desired password
--- CREATE USER IF NOT EXISTS 'nosgoth_egb'@'localhost' IDENTIFIED BY 'your_password_here';
+-- CREATE USER IF NOT EXISTS '{{DB_USER}}'@'localhost' IDENTIFIED BY '{{DB_PWD}}';
 
 -- Step 2: Grant Privileges on all egb_* tables
--- GRANT ALL PRIVILEGES ON nosgoth_egb.egb_* TO 'nosgoth_egb'@'localhost';
+-- GRANT ALL PRIVILEGES ON {{DB_NAME}}.egb_* TO '{{DB_NAME}}'@'localhost';
 -- FLUSH PRIVILEGES;
 
 -- ============================================
