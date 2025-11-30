@@ -10,7 +10,7 @@ class CharacterRepository:
     """
     def __init__(self, pg_pool: aiomysql.Pool):
         self.pg_pool = pg_pool
-    
+
     async def get_character(self, discord_id: int) -> Optional[Character]:
         """
         Load character from database by Discord ID
@@ -20,13 +20,13 @@ class CharacterRepository:
             async with self.pg_pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cursor:
                     await cursor.execute(
-                        '''SELECT discord_id, level, last_attempt, last_successful_levelup 
-                           FROM egb_characters 
+                        '''SELECT discord_id, level, last_attempt, last_successful_levelup
+                           FROM egb_characters
                            WHERE discord_id = %s''',
                         (discord_id,)
                     )
                     data = await cursor.fetchone()
-            
+
             if data:
                 return Character(
                     discord_id=data['discord_id'],
@@ -36,9 +36,9 @@ class CharacterRepository:
                 )
             return None
         except Exception as e:
-            print(f"Error loading character {discord_id}: {e}")
+            print(f"Error loading character {discord_id}: {e}", file=sys.stderr)
             return None
-    
+
     async def create_character(self, discord_id: int) -> Character:
         """
         Create a new character in the database
@@ -53,9 +53,9 @@ class CharacterRepository:
                     )
             return Character(discord_id=discord_id)
         except Exception as e:
-            print(f"Error creating character {discord_id}: {e}")
+            print(f"Error creating character {discord_id}: {e}", file=sys.stderr)
             raise
-    
+
     async def save_character(self, character: Character) -> bool:
         """
         Save character state to database
@@ -81,9 +81,9 @@ class CharacterRepository:
                     )
             return True
         except Exception as e:
-            print(f"Error saving character {character.get_discord_id()}: {e}")
+            print(f"Error saving character {character.get_discord_id()}: {e}", file=sys.stderr)
             return False
-    
+
     async def get_top_characters(self, limit: int = 10) -> list[Character]:
         """
         Get top characters by level for leaderboard
@@ -99,7 +99,7 @@ class CharacterRepository:
                         (limit,)
                     )
                     rows = await cursor.fetchall()
-            
+
             return [
                 Character(
                     discord_id=row['discord_id'],
@@ -110,9 +110,9 @@ class CharacterRepository:
                 for row in rows
             ]
         except Exception as e:
-            print(f"Error getting top characters: {e}")
+            print(f"Error getting top characters: {e}", file=sys.stderr)
             return []
-    
+
     async def character_exists(self, discord_id: int) -> bool:
         """
         Check if character exists in database
@@ -127,5 +127,5 @@ class CharacterRepository:
                     result = await cursor.fetchone()
                     return result[0] > 0
         except Exception as e:
-            print(f"Error checking character existence {discord_id}: {e}")
+            print(f"Error checking character existence {discord_id}: {e}", file=sys.stderr)
             return False
