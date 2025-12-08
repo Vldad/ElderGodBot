@@ -2,15 +2,15 @@
 -- Elder God Bot - Complete Database Setup
 -- ============================================
 
-USE your_database_name;
+USE nosgoth_egb;
 
 -- Step 1: Create User
 -- MANUAL STEP: Replace 'your_password_here' with your desired password
-CREATE USER IF NOT EXISTS 'nosgoth_dbuser'@'localhost' IDENTIFIED BY 'your_password_here';
+-- CREATE USER IF NOT EXISTS '{{DB_USER}}'@'localhost' IDENTIFIED BY '{{DB_PWD}}';
 
 -- Step 2: Grant Privileges on all egb_* tables
-GRANT ALL PRIVILEGES ON your_database_name.egb_* TO 'nosgoth_dbuser'@'localhost';
-FLUSH PRIVILEGES;
+-- GRANT ALL PRIVILEGES ON {{DB_NAME}}.egb_* TO '{{DB_NAME}}'@'localhost';
+-- FLUSH PRIVILEGES;
 
 -- ============================================
 -- Step 3: Create Tables
@@ -126,8 +126,8 @@ SHOW TABLES LIKE 'egb_%';
 SELECT * FROM egb_dim_characters;
 
 -- Show inserted quotes with character names
-SELECT q.id, c.name_en, c.name_fr, q.quote_en, q.quote_fr 
-FROM egb_quotes q 
+SELECT q.id, c.name_en, c.name_fr, q.quote_en, q.quote_fr
+FROM egb_quotes q
 INNER JOIN egb_dim_characters c ON c.Id = q.character_id;
 
 -- Show grants for nosgoth_dbuser
