@@ -56,15 +56,18 @@ class AbilityCommands:
                             (interaction.user.id,)
                         )
                         bonuses = await cursor.fetchone()
-
+                        
                 # Clear bonuses after use
                 if bonuses:
-                    await bot.mdb_con.execute(
-                        '''UPDATE egb_character_bonuses 
-                           SET devour_bonus = 0, curse_penalty = 0, guaranteed_levelup = FALSE 
-                           WHERE discord_id = %s''',
-                        interaction.user.id
-                    )
+                    async with bot.mdb_con.acquire() as conn:
+                        async with conn.cursor() as cursor:
+                            await cursor.execute(
+                                '''UPDATE egb_character_bonuses 
+                                SET devour_bonus = 0, curse_penalty = 0, guaranteed_levelup = FALSE 
+                                WHERE discord_id = %s''',
+                                (interaction.user.id,)
+                            )
+                            await conn.commit()
 
                 await bot.ability_manager.use_ability(interaction.user.id, 'chaussette')
                 
