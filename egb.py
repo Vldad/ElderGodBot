@@ -1,5 +1,6 @@
 import os
 import discord
+import sys
 from dotenv import load_dotenv
 from eldergod import ElderGod
 
@@ -23,7 +24,7 @@ def main():
 
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     if missing_vars:
-        print(f"ERROR: Missing required environment variables: {', '.join(missing_vars)}")
+        print(f"ERROR: Missing required environment variables: {', '.join(missing_vars)}", file=sys.stderr)
         return
 
     # Setup intents
@@ -37,7 +38,6 @@ def main():
     try:
         bot.run(os.getenv('DISCORD_TOKEN'))
     except discord.LoginFailure:
-        print("ERROR: Invalid Discord token")
         print("ERROR: Invalid Discord token", file=sys.stderr)
     except Exception as e:
         print(f"ERROR: Bot crashed - {e}", file=sys.stderr)

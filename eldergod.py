@@ -1,5 +1,6 @@
 import os
 import aiomysql
+import sys
 from datetime import datetime
 import discord
 from discord.ext import commands
@@ -43,7 +44,7 @@ class ElderGod(commands.Bot):
     async def setup_hook(self):
         """Initialize database connection and repository"""
         if not self.mdb_con:
-            print("Setting up database connection...")
+            print("Setting up database connection...", file=sys.stdout)
             try:
                 self.mdb_con = await aiomysql.create_pool(
                     host = os.getenv('DB_MDB_HOST', 'localhost'),
@@ -55,7 +56,7 @@ class ElderGod(commands.Bot):
                 )
                 self.character_repo = CharacterRepository(self.mdb_con)
                 self.ability_manager = AbilityManager(self.mdb_con)
-                print("Database connected successfully!")
+                print("Database connected successfully!", file=sys.stdout)
             except Exception as e:
                 print(f"Error setting up database: {e}", file=sys.stderr)
                 raise
@@ -66,12 +67,12 @@ class ElderGod(commands.Bot):
             guild_id = int(os.getenv('GUILD_ID', '1291793636996157562'))
             await self.tree.sync(guild=discord.Object(id=guild_id))
             sc = await self.tree.sync()
-            print(f"Synced {len(sc)} commands globally")
+            print(f"Synced {len(sc)} commands globally", file=sys.stdout)
         except Exception as e:
             print(f"Error syncing commands: {e}", file=sys.stderr)
 
         await self.get_all_characters()
-        print(f"{__name__} is up and ready!")
+        print(f"{__name__} is up and ready!", file=sys.stdout)
 
     def add_commands(self):
         """Register all slash commands"""
