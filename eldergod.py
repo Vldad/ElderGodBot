@@ -195,12 +195,15 @@ class ElderGod(commands.Bot):
                 
                 # Clear bonuses after use
                 if bonuses:
-                    await self.mdb_con.execute(
-                        '''UPDATE egb_character_bonuses 
-                           SET devour_bonus = 0, curse_penalty = 0, guaranteed_levelup = FALSE 
-                           WHERE discord_id = %s''',
-                        interaction.user.id
-                    )
+                    async with self.mdb_con.acquire() as conn:
+                        async with conn.cursor() as cursor:
+                            await cursor.execute(
+                                '''UPDATE egb_character_bonuses 
+                                SET devour_bonus = 0, curse_penalty = 0, guaranteed_levelup = FALSE 
+                                WHERE discord_id = %s''',
+                                (interaction.user.id,)
+                            )
+                            await conn.commit()
                 
                 clan_info = ClanSystem.get_clan_by_level(character.get_level())
                 embed = discord.Embed(
