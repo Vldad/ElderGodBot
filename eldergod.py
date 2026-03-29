@@ -485,13 +485,19 @@ class ElderGod(commands.Bot):
                 # Show unlocked abilities
                 abilities = ClanSystem.get_unlocked_abilities(character.get_level())
                 if abilities:
+                    top_chars = await self.character_repo.get_top_characters(limit=1)
+                    leader_id = top_chars[0].get_discord_id() if top_chars else None
+                    is_leader = leader_id == interaction.user.id
+
                     abilities_list = []
                     for a in abilities:
+                        if a['command'] == '/oppress' and not is_leader:
+                            continue
                         user_id = -1 if a['is_cooldown_global'] else interaction.user.id
                         result = await self.ability_manager.can_use_ability(
-                            user_id, 
-                            a['command'].replace('/',''), 
-                            a['cooldown_days'], 
+                            user_id,
+                            a['command'].replace('/',''),
+                            a['cooldown_days'],
                             True
                         )
                         cooldown_text = result[1]  # Get the second value from tuple
