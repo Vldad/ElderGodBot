@@ -1,6 +1,7 @@
 import aiomysql
 from datetime import datetime, timedelta
 from typing import Optional
+import sys
 
 class AbilityManager:
     """
@@ -9,7 +10,7 @@ class AbilityManager:
     def __init__(self, pg_pool: aiomysql.Pool):
         self.pg_pool = pg_pool
 
-    async def can_use_ability(self, discord_id: int, ability_name: str, cooldown_days: int = 7) -> tuple[bool, Optional[str]]:
+    async def can_use_ability(self, discord_id: int, ability_name: str, cooldown_days: int = 7, short_version: bool = False) -> tuple[bool, Optional[str]]:
         """
         Check if user can use an ability based on cooldown
         Returns: (can_use: bool, message: Optional[str])
@@ -17,14 +18,20 @@ class AbilityManager:
         try:
             async with self.pg_pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cursor:
-                    await cursor.execute(
-                        'SELECT last_used FROM egb_ability_usage WHERE discord_id = %s AND ability_name = %s',
-                        (discord_id, ability_name)
-                    )
+                    if discord_id == -1:
+                        await cursor.execute(
+                        'SELECT max(last_used) as last_used FROM egb_ability_usage WHERE ability_name = %s',
+                        (ability_name,)
+                        )
+                    else:
+                        await cursor.execute(
+                            'SELECT last_used FROM egb_ability_usage WHERE discord_id = %s AND ability_name = %s',
+                            (discord_id, ability_name)
+                        )
                     result = await cursor.fetchone()
 
             if not result:
-                return True, None
+                return True, "Disponible"
 
             last_used = result['last_used']
             cooldown = timedelta(days=cooldown_days)
@@ -36,11 +43,29 @@ class AbilityManager:
                 hours = remaining.seconds // 3600
 
                 if days > 0:
-                    return False, f"Disponible dans {days} jour(s) et {hours}h"
+                    if short_version:
+                        if hours != 0:
+                            return False, f"{days} jour(s) et {hours}h"
+                        else:
+                            mins = remaining.seconds // 60
+                            return False, f"{days} jour(s) et {mins} minutes"
+                    else:
+                        return False, f"Disponible dans {days} jour(s) et {hours}h"
                 else:
-                    return False, f"Disponible dans {hours}h"
+                    if short_version:
+                        if hours != 0:
+                            return False, f"{hours}h"
+                        else:
+                            mins = remaining.seconds // 60
+                            return False, f"{mins} minutes"
+                    else:
+                        if hours != 0:
+                            return False, f"Disponible dans {hours}h"
+                        else:
+                            mins = remaining.seconds // 60
+                            return False, f"Disponible dans {mins} minutes"
 
-            return True, None
+            return True, "Disponible"
 
         except Exception as e:
             print(f"Error checking ability cooldown: {e}", file=sys.stderr)

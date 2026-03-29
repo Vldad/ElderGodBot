@@ -26,7 +26,7 @@ class Character:
         return self._lastSuccessfulLevelup
     
     # Business Logic
-    def can_attempt_levelup(self, cooldown_hours: int = 1, has_swim_bonus: bool = False, has_chaussette_bonus: bool = False) -> tuple[bool, str]:
+    def can_attempt_levelup(self, cooldown_hours: int = 1, has_swim_bonus: bool = False, has_chaussette_bonus: bool = False, has_freeze_malus: bool = False) -> tuple[bool, str]:
         """
         Check if user can attempt levelup
         has_swim_bonus: If True, bypasses all cooldowns
@@ -40,6 +40,10 @@ class Character:
         if has_chaussette_bonus:
             return True, "Bonus Chaussette actif !"
         
+        # Entomb malus bypasses all checks
+        if has_freeze_malus:
+            return False, "Malus Entomb actif !"
+
         today = date.today()
         
         # Check attempt cooldown first (1 hour between ANY attempts)
@@ -53,13 +57,13 @@ class Character:
                 remaining_seconds = (cooldown - time_since_last).seconds % 60
                 
                 if remaining_minutes > 0:
-                    return False, f"Attendez encore {remaining_minutes} minute(s) et {remaining_seconds} seconde(s) avant de réessayer."
+                    return False, f"Attends encore {remaining_minutes} minute(s) et {remaining_seconds} seconde(s) avant de réessayer."
                 else:
-                    return False, f"Attendez encore {remaining_seconds} seconde(s) avant de réessayer."
+                    return False, f"Attends encore {remaining_seconds} seconde(s) avant de réessayer."
         
         # Then check if already leveled up successfully today (prevents multiple successes per day)
         if self._lastSuccessfulLevelup and self._lastSuccessfulLevelup >= today:
-            return False, "Vous avez déjà réussi un level up aujourd'hui ! Revenez demain."
+            return False, "Tu as déjà réussi un level up aujourd'hui ! Reviens demain."
         
         return True, "Prêt !"
     
@@ -77,29 +81,32 @@ class Character:
         # Add bonus per hour waited, cap at max_chance
         bonus = min(hours_since_last * bonus_per_hour, max_chance - base_chance)
         return min(base_chance + bonus, max_chance)
-    
+
     def attempt_to_levelup(self, base_chance: int = 20, bonus_per_hour: int = 5, 
-                          max_chance: int = 80, cooldown_hours: int = 1, has_swim_bonus: bool = False, has_chaussette_bonus: bool = False) -> tuple[bool, str, float]:
+                          max_chance: int = 80, flat_chance: int = 0, cooldown_hours: int = 1, has_swim_bonus: bool = False, has_chaussette_bonus: bool = False, has_freeze_malus: bool = False) -> tuple[bool, str, float]:
         """
         Attempt to level up the character
         has_swim_bonus: If True, bypasses cooldown checks
         Returns: (success: bool, message: str, probability: float)
         """
-        can_attempt, msg = self.can_attempt_levelup(cooldown_hours, has_swim_bonus, has_chaussette_bonus)
+        can_attempt, msg = self.can_attempt_levelup(cooldown_hours, has_swim_bonus, has_chaussette_bonus, has_freeze_malus)
         if not can_attempt:
             return False, msg, 0
-        
+               
+        probability = self.calculate_success_chance(base_chance, bonus_per_hour, max_chance)
+        probability += flat_chance
+        probability = max(min(probability, 100.0), 0.0)
+
         now = datetime.now()
         self._lastAttempt = now
-        
-        probability = self.calculate_success_chance(base_chance, bonus_per_hour, max_chance)
-        success = random.random() < (probability / 100.0)
+
+        success = random.random() <= (probability / 100.0)
         
         if success:
             self._level_up()
-            return True, f"Succès ! Vous êtes maintenant niveau {self._level} ! 🎉", probability
+            return True, f"Succès ! Tu es maintenant niveau {self._level} ! 🎉", probability
         else:
-            return False, f"Échec... Retentez votre chance plus tard ! ({probability:.1f}% de chance)", probability
+            return False, f"Échec... Retente ta chance plus tard ! ({probability:.1f}% de chance)", probability
     
     def _level_up(self):
         """Internal method to increase level"""

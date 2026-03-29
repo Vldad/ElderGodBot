@@ -55,15 +55,48 @@ CREATE TABLE IF NOT EXISTS egb_ability_usage (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table: egb_character_bonuses
+-- Single-source effects only. Multi-source effects (bless, curse, steal) live in egb_character_effects.
 CREATE TABLE IF NOT EXISTS egb_character_bonuses (
     discord_id BIGINT PRIMARY KEY,
     devour_bonus INT DEFAULT 0,
-    curse_penalty INT DEFAULT 0,
-    guaranteed_levelup BOOLEAN DEFAULT FALSE,
     swim_active BOOLEAN DEFAULT FALSE,
+    leader_curse_until DATETIME NULL,
+    oppression_malus INT DEFAULT 0,
+    oppression_until DATETIME NULL,
+    shield_until DATETIME NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
     INDEX idx_character_bonuses_discord_id (discord_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table: egb_character_effects
+-- Tracks multi-source effects: bless, curse, steal_bonus, steal_malus.
+-- One row per (source → target) interaction. Cleared after the target's next /levelup.
+-- source_discord_id = -1 means unknown source (legacy migrated data).
+CREATE TABLE IF NOT EXISTS egb_character_effects (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    discord_id BIGINT NOT NULL,
+    source_discord_id BIGINT NOT NULL,
+    effect_type ENUM('bless', 'curse', 'steal_bonus', 'steal_malus') NOT NULL,
+    amount INT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_effects_discord_id (discord_id),
+    INDEX idx_effects_source (source_discord_id),
+    INDEX idx_effects_discord_type (discord_id, effect_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table: egb_pacts
+CREATE TABLE IF NOT EXISTS egb_pacts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    requester_id BIGINT NOT NULL,
+    target_id BIGINT NOT NULL,
+    status ENUM('active', 'expired', 'declined') NOT NULL DEFAULT 'active',
+    accepted_at DATETIME NULL,
+    expires_at DATETIME NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_pacts_requester (requester_id),
+    INDEX idx_pacts_target (target_id),
+    INDEX idx_pacts_status_expires (status, expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table: egb_dim_characters

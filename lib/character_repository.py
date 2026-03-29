@@ -1,6 +1,6 @@
 import aiomysql
+import sys
 from typing import Optional
-from datetime import date
 from .character import Character
 
 class CharacterRepository:
