@@ -389,7 +389,11 @@ class ElderGod(commands.Bot):
                         )
                         effects_rows = await cursor.fetchall()
 
-                status_text = f"{msg}\nChance de succès : {success_chance:.1f}%"
+                has_swim = bonuses and bonuses.get('swim_active')
+                if has_swim and not can_attempt:
+                    status_text = "🌊 Nage active — cooldown contourné !\nChance de succès : {:.1f}%".format(success_chance)
+                else:
+                    status_text = f"{msg}\nChance de succès : {success_chance:.1f}%"
 
                 # Display bonuses/penalties
                 total_bonus = 0
@@ -398,6 +402,9 @@ class ElderGod(commands.Bot):
                 has_bonusmalus = False
 
                 if bonuses:
+                    if bonuses.get('swim_active'):
+                        bonus_details.append("🌊 Nage active (cooldown contourné)")
+                        has_bonusmalus = True
                     if bonuses.get('devour_bonus'):
                         total_bonus += bonuses['devour_bonus']
                         bonus_details.append(f"Devour: +{bonuses['devour_bonus']}%")
