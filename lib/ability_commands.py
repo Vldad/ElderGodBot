@@ -1165,7 +1165,7 @@ class AbilityCommands:
                         f"**{interaction.user.display_name}** te propose un **Pacte de Sang** !\n\n"
                         f"Pendant 24h, vous partagerez bonus et malus.\n"
                         f"Chaque level up réussi vous accordera un niveau à tous les deux.\n\n"
-                        f"Tu as **60 secondes** pour accepter ou refuser."
+                        f"Tu as **1 heure** pour accepter ou refuser."
                     ),
                     color=clan_info['color']
                 )
@@ -1174,7 +1174,7 @@ class AbilityCommands:
                     bot=bot,
                     requester=interaction.user,
                     target=target,
-                    timeout=60
+                    timeout=3600
                 )
 
                 try:
