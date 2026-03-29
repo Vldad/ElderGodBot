@@ -11,10 +11,12 @@ class ClanSystem:
         'fledgling': {
             'name_key': 'CLAN_FLEDGLING',
             'level_range': (1, 4),
-            'title': 'Novice',
+            'title': 'Humain',
             'color_key': 'COLOR_FLEDGLING',
             'description': 'Un jeune vampire, encore faible et inexpérimenté.',
-            'abilities': []
+            'abilities': [
+                {'level': 1, 'command': '/bless', 'description': 'Bénir un joueur (+3-8% cumulatif)', 'cooldown_days': 7, 'is_cooldown_global': False}
+            ]
         },
         'melchahim': {
             'name_key': 'CLAN_MELCHAHIM',
@@ -23,8 +25,9 @@ class ClanSystem:
             'color_key': 'COLOR_MELCHAHIM',
             'description': 'Membre du clan de Melchiah, les dévoreurs.',
             'abilities': [
-                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes'},
-                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine'}
+                {'level': 1, 'command': '/bless', 'description': 'Bénir un joueur (+3-8% cumulatif)', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes', 'cooldown_days': 1, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine', 'cooldown_days': 7, 'is_cooldown_global': False}
             ]
         },
         'zephonim': {
@@ -34,9 +37,11 @@ class ClanSystem:
             'color_key': 'COLOR_ZEPHONIM',
             'description': 'Membre du clan de Zephon, les grimpeurs de murs.',
             'abilities': [
-                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes'},
-                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine'},
-                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur'}
+                {'level': 1, 'command': '/bless', 'description': 'Bénir un joueur (+3-8% cumulatif)', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes', 'cooldown_days': 1, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/entomb', 'description': 'Condamner le leader pendant 1-2 jours', 'cooldown_days': 7, 'is_cooldown_global': True}
             ]
         },
         'dumahim': {
@@ -46,10 +51,11 @@ class ClanSystem:
             'color_key': 'COLOR_DUMAHIM',
             'description': 'Membre du clan de Dumah, les impitoyables.',
             'abilities': [
-                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes'},
-                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine'},
-                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur'},
-                {'level': 15, 'command': '/swap', 'description': 'Échanger des niveaux avec un autre joueur'}
+                {'level': 1, 'command': '/bless', 'description': 'Bénir un joueur (+3-8% cumulatif)', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes', 'cooldown_days': 1, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/entomb', 'description': 'Condamner le leader pendant 1-2 jours', 'cooldown_days': 7, 'is_cooldown_global': True}
             ]
         },
         'rahabim': {
@@ -59,11 +65,12 @@ class ClanSystem:
             'color_key': 'COLOR_RAHABIM',
             'description': 'Membre du clan de Rahab, les habitants des eaux.',
             'abilities': [
-                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes'},
-                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine'},
-                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur'},
-                {'level': 15, 'command': '/swap', 'description': 'Échanger des niveaux avec un autre joueur'},
-                {'level': 20, 'command': '/swim', 'description': 'Contourner le cooldown une fois par semaine'}
+                {'level': 1, 'command': '/bless', 'description': 'Bénir un joueur (+3-8% cumulatif)', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes', 'cooldown_days': 1, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/entomb', 'description': 'Condamner le leader pendant 1-2 jours', 'cooldown_days': 7, 'is_cooldown_global': True},
+                {'level': 20, 'command': '/swim', 'description': 'Contourner le cooldown une fois par semaine', 'cooldown_days': 7, 'is_cooldown_global': False}
             ]
         },
         'turelim': {
@@ -73,11 +80,12 @@ class ClanSystem:
             'color_key': 'COLOR_TURELIM',
             'description': 'Membre du clan de Turel, les bannis.',
             'abilities': [
-                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes'},
-                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine'},
-                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur'},
-                {'level': 15, 'command': '/swap', 'description': 'Échanger des niveaux avec un autre joueur'},
-                {'level': 20, 'command': '/swim', 'description': 'Contourner le cooldown une fois par semaine'}
+                {'level': 1, 'command': '/bless', 'description': 'Bénir un joueur (+3-8% cumulatif)', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes', 'cooldown_days': 1, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/entomb', 'description': 'Condamner le leader pendant 1-2 jours', 'cooldown_days': 7, 'is_cooldown_global': True},
+                {'level': 20, 'command': '/swim', 'description': 'Contourner le cooldown une fois par semaine', 'cooldown_days': 7, 'is_cooldown_global': False}
             ]
         },
 
@@ -89,13 +97,14 @@ class ClanSystem:
             'has_wings': True,
             'description': 'Membre du clan de Raziel, les élus.',
             'abilities': [
-                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes'},
-                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine'},
-                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur'},
-                {'level': 15, 'command': '/swap', 'description': 'Échanger des niveaux avec un autre joueur'},
-                {'level': 20, 'command': '/swim', 'description': 'Contourner le cooldown une fois par semaine'},
-                {'level': 30, 'command': '/evolve', 'description': 'Obtenir des ailes (rôle cosmétique)'},
-                {'level': 30, 'command': '/spectral', 'description': 'Voir le royaume spectral'}
+                {'level': 1, 'command': '/bless', 'description': 'Bénir un joueur (+3-8% cumulatif)', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes', 'cooldown_days': 1, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/entomb', 'description': 'Condamner le leader pendant 1-2 jours', 'cooldown_days': 7, 'is_cooldown_global': True},
+                {'level': 20, 'command': '/swim', 'description': 'Contourner le cooldown une fois par semaine', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 30, 'command': '/evolve', 'description': 'Obtenir des ailes (rôle cosmétique)', 'cooldown_days': 0, 'is_cooldown_global': False},
+                {'level': 30, 'command': '/spectral', 'description': 'Voir le royaume spectral', 'cooldown_days': 0, 'is_cooldown_global': False}
             ]
         },
         'elder': {
@@ -105,13 +114,16 @@ class ClanSystem:
             'color_key': 'COLOR_ELDER',
             'description': 'Un vampire ancien, d\'une puissance immense.',
             'abilities': [
-                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes'},
-                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine'},
-                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur'},
-                {'level': 15, 'command': '/swap', 'description': 'Échanger des niveaux avec un autre joueur'},
-                {'level': 20, 'command': '/swim', 'description': 'Contourner le cooldown une fois par semaine'},
-                {'level': 30, 'command': '/evolve', 'description': 'Obtenir des ailes (rôle cosmétique)'},
-                {'level': 30, 'command': '/spectral', 'description': 'Voir le royaume spectral'}
+                {'level': 1, 'command': '/bless', 'description': 'Bénir un joueur (+3-8% cumulatif)', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/devour', 'description': 'Dévorer les âmes', 'cooldown_days': 1, 'is_cooldown_global': False},
+                {'level': 5, 'command': '/chaussette', 'description': 'Crier CHAUSSETTE pour un level gratuit par semaine', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/curse', 'description': 'Maudire un autre joueur', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 10, 'command': '/entomb', 'description': 'Condamner le leader pendant 1-2 jours', 'cooldown_days': 7, 'is_cooldown_global': True},
+                {'level': 20, 'command': '/swim', 'description': 'Contourner le cooldown une fois par semaine', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 30, 'command': '/evolve', 'description': 'Obtenir des ailes (rôle cosmétique)', 'cooldown_days': 0, 'is_cooldown_global': False},
+                {'level': 30, 'command': '/spectral', 'description': 'Voir le royaume spectral', 'cooldown_days': 0, 'is_cooldown_global': False},
+                {'level': 40, 'command': '/steal', 'description': 'Siphonner 5-10% de chance d\'un joueur', 'cooldown_days': 1, 'is_cooldown_global': False},
+                {'level': 50, 'command': '/shield', 'description': 'Activer un bouclier qui absorbe le prochain malus (24h)', 'cooldown_days': 7, 'is_cooldown_global': False}
             ]
         }
     }

@@ -2,8 +2,10 @@ import discord
 import aiomysql
 from discord import app_commands
 from datetime import datetime
+from datetime import timedelta
 from .clan_system import ClanSystem
 import random
+import sys
 
 class AbilityCommands:
     """
@@ -14,11 +16,32 @@ class AbilityCommands:
     def register_commands(bot):
         """Register all ability commands to the bot"""
         
+        # ===== SHIELD HELPER =====
+        async def _check_and_consume_shield(target_id: int) -> bool:
+            """Check if target has an active shield and consume it. Returns True if blocked."""
+            async with bot.mdb_con.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cursor:
+                    await cursor.execute(
+                        'SELECT shield_until FROM egb_character_bonuses WHERE discord_id = %s',
+                        (target_id,)
+                    )
+                    row = await cursor.fetchone()
+            if row and row.get('shield_until') and row['shield_until'] > datetime.now():
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor() as cursor:
+                        await cursor.execute(
+                            'UPDATE egb_character_bonuses SET shield_until = NULL WHERE discord_id = %s',
+                            (target_id,)
+                        )
+                        await conn.commit()
+                return True
+            return False
+
         # ===== CHAUSSETTE (Level 5+) =====
         @bot.tree.command(name="chaussette", description="Crier CHAUSSETTE pour un level gratuit par semaine")
         async def chaussette(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
-                await bot._send_error_embed(interaction, "Vous devez avoir le rôle **Joueur**.")
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
                 return
             
             try:
@@ -28,7 +51,7 @@ class AbilityCommands:
                 if character.get_level() < 5:
                     await bot._send_error_embed(
                         interaction,
-                        "Vous devez être niveau 5 minimum pour utiliser cette capacité."
+                        "Tu dois être niveau 5 minimum pour utiliser cette capacité."
                     )
                     return
                 
@@ -40,41 +63,32 @@ class AbilityCommands:
                 )
                 
                 if not can_use:
-                    await bot._send_error_embed(interaction, f"Capacité en cooldown. {msg}")
+                    await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {msg}")
                     return
 
                 # Level up !
-                character._level += 1
-                character._lastSuccessfulLevelup = __import__('datetime').date.today()
+                character._level_up()
                 await bot.character_repo.save_character(character)
 
-                # Check for bonuses/penalties
+                # Clear bonuses after use
                 async with bot.mdb_con.acquire() as conn:
-                    async with conn.cursor(aiomysql.DictCursor) as cursor:
+                    async with conn.cursor() as cursor:
                         await cursor.execute(
-                            'SELECT devour_bonus, curse_penalty, guaranteed_levelup, swim_active FROM egb_character_bonuses WHERE discord_id = %s',
+                            'UPDATE egb_character_bonuses SET devour_bonus = 0, swim_active = FALSE WHERE discord_id = %s',
                             (interaction.user.id,)
                         )
-                        bonuses = await cursor.fetchone()
-                        
-                # Clear bonuses after use
-                if bonuses:
-                    async with bot.mdb_con.acquire() as conn:
-                        async with conn.cursor() as cursor:
-                            await cursor.execute(
-                                '''UPDATE egb_character_bonuses 
-                                SET devour_bonus = 0, curse_penalty = 0, guaranteed_levelup = FALSE 
-                                WHERE discord_id = %s''',
-                                (interaction.user.id,)
-                            )
-                            await conn.commit()
+                        await cursor.execute(
+                            'DELETE FROM egb_character_effects WHERE discord_id = %s',
+                            (interaction.user.id,)
+                        )
+                        await conn.commit()
 
                 await bot.ability_manager.use_ability(interaction.user.id, 'chaussette')
                 
                 clan_info = bot.get_clan_info_for_user(character.get_level())
                 embed = discord.Embed(
                     title="🧦 CHAUSSETTE !",
-                    description=f"Vous avez crié CHAUSSETTE et automatiquement gagné **1 niveau** !",
+                    description=f"Tu as crié CHAUSSETTE et automatiquement gagné **1 niveau** !",
                     color=clan_info['color']
                 )
 
@@ -89,14 +103,14 @@ class AbilityCommands:
                     if role_assigned:
                         embed.add_field(
                             name="🦇 Évolution !",
-                            value=f"Vous êtes devenu **{new_clan['title']}** du clan **{new_clan['name']}** !",
+                            value=f"Tu es devenu **{new_clan['title']}** du clan **{new_clan['name']}** !",
                             inline=False
                         )
                     else:
                         # User is admin/owner, send DM
                         embed.add_field(
                             name="🦇 Évolution !",
-                            value=f"Vous êtes devenu **{new_clan['title']}** du clan **{new_clan['name']}** !",
+                            value=f"Tu es devenu **{new_clan['title']}** du clan **{new_clan['name']}** !",
                             inline=False
                         )
                         await bot._send_admin_dm(interaction.user, new_clan)
@@ -111,6 +125,7 @@ class AbilityCommands:
                             inline=False
                         )
                 
+                await bot._apply_pact_level(interaction.user, embed)
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 await bot.log(interaction.user.id, datetime.now(), f'chaussette')
                 
@@ -122,7 +137,7 @@ class AbilityCommands:
         @bot.tree.command(name="devour", description="Dévorer les âmes pour un bonus d'XP")
         async def devour(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
-                await bot._send_error_embed(interaction, "Vous devez avoir le rôle **Joueur**.")
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
                 return
             
             try:
@@ -132,7 +147,7 @@ class AbilityCommands:
                 if character.get_level() < 5:
                     await bot._send_error_embed(
                         interaction,
-                        "Vous devez être niveau 5 minimum pour utiliser cette capacité."
+                        "Tu dois être niveau 5 minimum pour utiliser cette capacité."
                     )
                     return
                 
@@ -144,7 +159,7 @@ class AbilityCommands:
                 )
                 
                 if not can_use:
-                    await bot._send_error_embed(interaction, f"Capacité en cooldown. {msg}")
+                    await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {msg}")
                     return
                 
                 # Devour gives a small bonus to next levelup chance
@@ -156,16 +171,38 @@ class AbilityCommands:
                         await cursor.execute(
                             '''INSERT INTO egb_character_bonuses (discord_id, devour_bonus)
                                VALUES (%s, %s)
-                               ON DUPLICATE KEY UPDATE devour_bonus = devour_bonus + %s''',
+                               ON DUPLICATE KEY UPDATE 
+                               devour_bonus = devour_bonus + %s''',
                             (character.get_discord_id(), bonus, bonus)
                         )
                 
                 await bot.ability_manager.use_ability(interaction.user.id, 'devour')
-                
+
+                partner_id = await bot.pact_manager.get_active_pact_partner(interaction.user.id)
+                if partner_id:
+                    async with bot.mdb_con.acquire() as conn:
+                        async with conn.cursor() as cursor:
+                            await cursor.execute(
+                                '''INSERT INTO egb_character_bonuses (discord_id, devour_bonus)
+                                   VALUES (%s, %s)
+                                   ON DUPLICATE KEY UPDATE devour_bonus = devour_bonus + %s''',
+                                (partner_id, bonus, bonus)
+                            )
+                            await conn.commit()
+                    try:
+                        partner_user = await bot.fetch_user(partner_id)
+                        await partner_user.send(embed=discord.Embed(
+                            title="🩸 Pacte de Sang — Dévoration",
+                            description=f"Ton pacte avec **{interaction.user.display_name}** t'a transmis un bonus de dévoration (**+{bonus}%**) pour ton prochain levelup !",
+                            color=discord.Color.dark_red()
+                        ))
+                    except Exception:
+                        pass
+
                 clan_info = bot.get_clan_info_for_user(character.get_level())
                 embed = discord.Embed(
                     title="🩸 Dévoration d'Âme",
-                    description=f"Vous avez dévoré une âme et gagné **+{bonus}%** pour votre prochaine tentative de level up !",
+                    description=f"Tu as dévoré une âme et gagné **+{bonus}%** pour ta prochaine tentative de level up !",
                     color=clan_info['color']
                 )
                 
@@ -180,7 +217,7 @@ class AbilityCommands:
         @bot.tree.command(name="swim", description="Contourner le cooldown quotidien une fois par semaine")
         async def swim(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
-                await bot._send_error_embed(interaction, "Vous devez avoir le rôle **Joueur**.")
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
                 return
             
             try:
@@ -189,7 +226,7 @@ class AbilityCommands:
                 if character.get_level() < 20:
                     await bot._send_error_embed(
                         interaction,
-                        "Vous devez être niveau 20 minimum pour utiliser cette capacité."
+                        "Tu dois être niveau 20 minimum pour utiliser cette capacité."
                     )
                     return
                 
@@ -198,7 +235,7 @@ class AbilityCommands:
                 if can_attempt:
                     await bot._send_error_embed(
                         interaction,
-                        "Vous n'avez pas encore réussi de level up aujourd'hui. Utilisez `/levelup` normalement."
+                        "Tu n'as pas encore réussi de level up aujourd'hui. Utilisez `/levelup` normalement."
                     )
                     return
                 
@@ -210,7 +247,7 @@ class AbilityCommands:
                 )
                 
                 if not can_use:
-                    await bot._send_error_embed(interaction, f"Capacité en cooldown. {cooldown_msg}")
+                    await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {cooldown_msg}")
                     return
                 
                 # Grant swim bonus (bypasses cooldowns on next attempt)
@@ -224,11 +261,32 @@ class AbilityCommands:
                         )
                 
                 await bot.ability_manager.use_ability(interaction.user.id, 'swim')
-                
+
+                partner_id = await bot.pact_manager.get_active_pact_partner(interaction.user.id)
+                if partner_id:
+                    async with bot.mdb_con.acquire() as conn:
+                        async with conn.cursor() as cursor:
+                            await cursor.execute(
+                                '''INSERT INTO egb_character_bonuses (discord_id, swim_active)
+                                   VALUES (%s, TRUE)
+                                   ON DUPLICATE KEY UPDATE swim_active = TRUE''',
+                                (partner_id,)
+                            )
+                            await conn.commit()
+                    try:
+                        partner_user = await bot.fetch_user(partner_id)
+                        await partner_user.send(embed=discord.Embed(
+                            title="🌊 Pacte de Sang — Nage",
+                            description=f"Ton pacte avec **{interaction.user.display_name}** t'a transmis le bonus de nage !\nTu peux contourner le cooldown de levelup sur ta prochaine tentative.",
+                            color=discord.Color.blue()
+                        ))
+                    except Exception:
+                        pass
+
                 clan_info = bot.get_clan_info_for_user(character.get_level())
                 embed = discord.Embed(
                     title="🌊 Nage dans les Abysses",
-                    description="Vous avez contourné les limites ! Votre prochaine tentative ignorera le cooldown horaire et la limite quotidienne.",
+                    description="Tu as contourné les limites ! Ta prochaine tentative ignorera la limite quotidienne.",
                     color=clan_info['color']
                 )
                 
@@ -244,7 +302,7 @@ class AbilityCommands:
         @app_commands.describe(target="Le joueur à maudire")
         async def curse(interaction: discord.Interaction, target: discord.Member):
             if not await bot._has_player_role(interaction.user):
-                await bot._send_error_embed(interaction, "Vous devez avoir le rôle **Joueur**.")
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
                 return
             
             try:
@@ -253,13 +311,13 @@ class AbilityCommands:
                 if character.get_level() < 10:
                     await bot._send_error_embed(
                         interaction,
-                        "Vous devez être niveau 10 minimum pour utiliser cette capacité."
+                        "Tu dois être niveau 10 minimum pour utiliser cette capacité."
                     )
                     return
                 
                 # Can't curse yourself
                 if target.id == interaction.user.id:
-                    await bot._send_error_embed(interaction, "Vous ne pouvez pas vous maudire vous-même !")
+                    await bot._send_error_embed(interaction, "Tu ne peux pas te maudire toi-même !")
                     return
                 
                 # Target must have player role
@@ -275,26 +333,78 @@ class AbilityCommands:
                 )
                 
                 if not can_use:
-                    await bot._send_error_embed(interaction, f"Capacité en cooldown. {cooldown_msg}")
+                    await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {cooldown_msg}")
                     return
                 
+                # Check target's shield
+                if await _check_and_consume_shield(target.id):
+                    await interaction.response.send_message(
+                        embed=discord.Embed(
+                            title="🛡️ Bouclier !",
+                            description=f"**{target.display_name}** est protégé par un bouclier mystique ! Ta malédiction est absorbée.",
+                            color=discord.Color.blue()
+                        ),
+                        ephemeral=True
+                    )
+                    try:
+                        await target.send(embed=discord.Embed(
+                            title="🛡️ Bouclier Activé !",
+                            description=f"Ton bouclier a absorbé la malédiction de **{interaction.user.display_name}** !",
+                            color=discord.Color.blue()
+                        ))
+                    except Exception:
+                        pass
+                    return
+
                 # Apply curse
-                curse_amount = -5
+                curse_amount = 5
                 async with bot.mdb_con.acquire() as conn:
                     async with conn.cursor() as cursor:
                         await cursor.execute(
-                            '''INSERT INTO egb_character_bonuses (discord_id, curse_penalty)
-                               VALUES (%s, %s)
-                               ON DUPLICATE KEY UPDATE curse_penalty = curse_penalty + %s''',
-                            (target.id, curse_amount, curse_amount)
+                            '''INSERT INTO egb_character_effects (discord_id, source_discord_id, effect_type, amount)
+                               VALUES (%s, %s, 'curse', %s)''',
+                            (target.id, interaction.user.id, curse_amount)
                         )
-                
+                        await conn.commit()
+
                 await bot.ability_manager.use_ability(interaction.user.id, 'curse')
-                
+
+                target_partner_id = await bot.pact_manager.get_active_pact_partner(target.id)
+                if target_partner_id:
+                    partner_blocked = await _check_and_consume_shield(target_partner_id)
+                    if not partner_blocked:
+                        async with bot.mdb_con.acquire() as conn:
+                            async with conn.cursor() as cursor:
+                                await cursor.execute(
+                                    '''INSERT INTO egb_character_effects (discord_id, source_discord_id, effect_type, amount)
+                                       VALUES (%s, %s, 'curse', %s)''',
+                                    (target_partner_id, interaction.user.id, curse_amount)
+                                )
+                                await conn.commit()
+                        try:
+                            partner_user = await bot.fetch_user(target_partner_id)
+                            await partner_user.send(embed=discord.Embed(
+                                title="💀 Pacte de Sang — Malédiction",
+                                description=f"**{interaction.user.display_name}** a maudit ton partenaire de pacte **{target.display_name}** !\nGrâce au pacte, tu subis également **-{curse_amount}%** pour ton prochain levelup.",
+                                color=discord.Color.dark_red()
+                            ))
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            partner_user = await bot.fetch_user(target_partner_id)
+                            await partner_user.send(embed=discord.Embed(
+                                title="🛡️ Bouclier Activé !",
+                                description=f"Ton bouclier a absorbé la malédiction de **{interaction.user.display_name}** (transmise via le pacte de **{target.display_name}**) !",
+                                color=discord.Color.blue()
+                            ))
+                        except Exception:
+                            pass
+
                 clan_info = bot.get_clan_info_for_user(character.get_level())
                 embed = discord.Embed(
                     title="💀 Malédiction",
-                    description=f"Vous avez maudit {target.mention} !\n\nIls subiront **-5%** de chance sur leur prochaine tentative de level up.",
+                    description=f"Tu as maudit {target.mention} !\n\nIls subiront **-{curse_amount}%** de chance sur leur prochaine tentative de level up.",
                     color=clan_info['color']
                 )
                 
@@ -302,7 +412,7 @@ class AbilityCommands:
                 try:
                     target_embed = discord.Embed(
                         title="💀 Malédiction !",
-                        description=f"{interaction.user.display_name} vous a maudit avec **curse** !\n\nVotre prochaine tentative de level up aura **-5%** de chance.",
+                        description=f"{interaction.user.display_name} t'a maudit avec **curse** !\nTa prochaine tentative de level up aura **-{curse_amount}%** de chance.",
                         color=discord.Color.dark_red()
                     )
                     await target.send(embed=target_embed)
@@ -315,130 +425,12 @@ class AbilityCommands:
             except Exception as e:
                 print(f"Error in curse command: {e}")
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
-        
-        # ===== SWAP (Level 15+) =====
-        @bot.tree.command(name="swap", description="Échanger des niveaux avec un autre joueur consentant")
-        @app_commands.describe(target="Le joueur avec qui échanger")
-        async def swap(interaction: discord.Interaction, target: discord.Member):
-            if not await bot._has_player_role(interaction.user):
-                await bot._send_error_embed(interaction, "Vous devez avoir le rôle **Joueur**.")
-                return
-            
-            try:
-                character = await bot.get_or_create_character(interaction.user.id)
-                
-                if character.get_level() < 15:
-                    await bot._send_error_embed(
-                        interaction,
-                        "Vous devez être niveau 15 minimum pour utiliser cette capacité."
-                    )
-                    return
-                
-                if target.id == interaction.user.id:
-                    await bot._send_error_embed(interaction, "Vous ne pouvez pas échanger avec vous-même !")
-                    return
-                
-                if not await bot._has_player_role(target):
-                    await bot._send_error_embed(interaction, f"{target.display_name} n'a pas le rôle **Joueur**.")
-                    return
-                
-                target_character = await bot.get_or_create_character(target.id)
-                
-                clan_info = bot.get_clan_info_for_user(character.get_level())
-                
-                # Create confirmation view
-                class SwapView(discord.ui.View):
-                    def __init__(self):
-                        super().__init__(timeout=60)
-                        self.value = None
-                    
-                    @discord.ui.button(label="Accepter", style=discord.ButtonStyle.green)
-                    async def accept(self, button_interaction: discord.Interaction, button: discord.ui.Button):
-                        if button_interaction.user.id != target.id:
-                            await button_interaction.response.send_message(
-                                "Seul le joueur ciblé peut accepter !",
-                                ephemeral=True
-                            )
-                            return
-                        self.value = True
-                        self.stop()
-                    
-                    @discord.ui.button(label="Refuser", style=discord.ButtonStyle.red)
-                    async def decline(self, button_interaction: discord.Interaction, button: discord.ui.Button):
-                        if button_interaction.user.id != target.id:
-                            await button_interaction.response.send_message(
-                                "Seul le joueur ciblé peut refuser !",
-                                ephemeral=True
-                            )
-                            return
-                        self.value = False
-                        self.stop()
-                
-                view = SwapView()
-                
-                embed = discord.Embed(
-                    title="🔄 Proposition d'Exil",
-                    description=f"{interaction.user.mention} (Niveau **{character.get_level()}**) propose d'échanger son niveau avec {target.mention} (Niveau **{target_character.get_level()}**).\n\n{target.mention}, acceptez-vous ?",
-                    color=clan_info['color']
-                )
-                
-                await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
-                
-                # Wait for response
-                await view.wait()
-                
-                if view.value is None:
-                    timeout_embed = discord.Embed(
-                        title="⏱️ Temps écoulé",
-                        description="La proposition d'échange a expiré.",
-                        color=discord.Color.orange()
-                    )
-                    await interaction.edit_original_response(embed=timeout_embed, view=None)
-                    return
-                
-                if not view.value:
-                    declined_embed = discord.Embed(
-                        title="❌ Refusé",
-                        description=f"{target.mention} a refusé l'échange.",
-                        color=discord.Color.red()
-                    )
-                    await interaction.edit_original_response(embed=declined_embed, view=None)
-                    return
-                
-                # Perform the exchange
-                temp_level = character.get_level()
-                character._level = target_character.get_level()
-                target_character._level = temp_level
-                
-                await bot.character_repo.save_character(character)
-                await bot.character_repo.save_character(target_character)
-                
-                # Update roles
-                new_clan_initiator = bot.get_clan_info_for_user(character.get_level())
-                new_clan_target = bot.get_clan_info_for_user(target_character.get_level())
-                
-                await bot._assign_clan_role(interaction.user, new_clan_initiator)
-                await bot._assign_clan_role(target, new_clan_target)
-                
-                success_embed = discord.Embed(
-                    title="✅ Échange Réussi !",
-                    description=f"{interaction.user.mention} est maintenant niveau **{character.get_level()}**\n{target.mention} est maintenant niveau **{target_character.get_level()}**",
-                    color=discord.Color.green()
-                )
-                
-                await interaction.edit_original_response(embed=success_embed, view=None)
-                await bot.log(interaction.user.id, datetime.now(), f'swap with {target.id}')
-                await bot.log(target.id, datetime.now(), f'swap with {interaction.user.id}')
-                
-            except Exception as e:
-                print(f"Error in swap command: {e}")
-                await bot._send_error_embed(interaction, "Une erreur est survenue.")
-                
+                      
         # ===== EVOLVE (Level 30+) =====
         @bot.tree.command(name="evolve", description="Obtenir les ailes de Raziel (rôle cosmétique)")
         async def evolve(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
-                await bot._send_error_embed(interaction, "Vous devez avoir le rôle **Joueur**.")
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
                 return
             
             try:
@@ -447,7 +439,7 @@ class AbilityCommands:
                 if character.get_level() < 30:
                     await bot._send_error_embed(
                         interaction,
-                        "Vous devez être niveau 30 minimum pour utiliser cette capacité."
+                        "Tu dois être niveau 30 minimum pour utiliser cette capacité."
                     )
                     return
                 
@@ -465,7 +457,7 @@ class AbilityCommands:
                 if wings_role in interaction.user.roles:
                     await bot._send_error_embed(
                         interaction,
-                        "Vous avez déjà les ailes de Raziel !"
+                        "Tu as déjà les ailes de Raziel !"
                     )
                     return
                 
@@ -475,7 +467,7 @@ class AbilityCommands:
                     clan_info = bot.get_clan_info_for_user(character.get_level())
                     embed = discord.Embed(
                         title="👼 Évolution Céleste",
-                        description=f"Vos ailes se déploient majestueusement !\n\nVous avez obtenu le rôle {wings_role.mention} !",
+                        description=f"Tes ailes se déploient majestueusement !\n\Tu as obtenu le rôle {wings_role.mention} !",
                         color=clan_info['color']
                     )
                     embed.set_image(url="https://i.imgur.com/raziel_wings.gif")  # Replace with actual image if desired
@@ -486,7 +478,7 @@ class AbilityCommands:
                 except discord.Forbidden:
                     await bot._send_error_embed(
                         interaction,
-                        f"Je ne peux pas vous attribuer le rôle. Veuillez vous attribuer manuellement le rôle **{wings_role_name}**."
+                        f"Je ne peux pas t'attribuer le rôle. Tu dois t'attribuer manuellement le rôle **{wings_role_name}**."
                     )
                 
             except Exception as e:
@@ -497,7 +489,7 @@ class AbilityCommands:
         @bot.tree.command(name="spectral", description="Voir le royaume spectral (classement caché)")
         async def spectral(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
-                await bot._send_error_embed(interaction, "Vous devez avoir le rôle **Joueur**.")
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
                 return
             
             try:
@@ -506,7 +498,7 @@ class AbilityCommands:
                 if character.get_level() < 30:
                     await bot._send_error_embed(
                         interaction,
-                        "Vous devez être niveau 30 minimum pour utiliser cette capacité."
+                        "Tu dois être niveau 30 minimum pour utiliser cette capacité."
                     )
                     return
                 
@@ -520,7 +512,7 @@ class AbilityCommands:
                 clan_info = bot.get_clan_info_for_user(character.get_level())
                 embed = discord.Embed(
                     title="👁️ Royaume Spectral",
-                    description="*Vous percevez les âmes des vampires les plus puissants...*",
+                    description="*Tu perçois les âmes des vampires les plus puissants...*",
                     color=clan_info['color']
                 )
                 
@@ -554,3 +546,880 @@ class AbilityCommands:
             except Exception as e:
                 print(f"Error in spectral command: {e}")
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
+
+        # ===== entomb (Level 10+) =====
+        @bot.tree.command(name="entomb", description="Condamner le leader à ne pas pouvoir levelup pendant 1-2 jours")
+        async def entomb(interaction: discord.Interaction):
+            if not await bot._has_player_role(interaction.user):
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
+                return
+            
+            try:
+                character = await bot.get_or_create_character(interaction.user.id)
+                
+                # Check level requirement
+                if character.get_level() < 10:
+                    await bot._send_error_embed(
+                        interaction,
+                        "Tu dois être niveau 10 minimum pour utiliser cette capacité."
+                    )
+                    return
+                
+                # Check cooldown (once per week)
+                can_use, msg = await bot.ability_manager.can_use_ability(
+                    -1, 
+                    'entomb', 
+                    cooldown_days=7
+                )
+                
+                if not can_use:
+                    await bot._send_cd_msg_embed(interaction, f"Cette commande a un cooldown global au serveur. {msg}")
+                    return
+                
+                # Get the top player (highest level, earliest if tied)
+                top_characters = await bot.character_repo.get_top_characters(limit=1)
+                
+                if not top_characters:
+                    await bot._send_error_embed(interaction, "Aucun joueur trouvé.")
+                    return
+                
+                leader = top_characters[0]
+                leader_id = leader.get_discord_id()
+                
+                # Don't let them entomb themselves
+                if leader_id == interaction.user.id:
+                    await bot._send_error_embed(
+                        interaction,
+                        "Tu es le leader ! Tu ne peux pas te condamner toi-même."
+                    )
+                    return
+                
+                # Check if leader is already cursed
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cursor:
+                        await cursor.execute(
+                            'SELECT leader_curse_until FROM egb_character_bonuses WHERE discord_id = %s',
+                            (leader_id,)
+                        )
+                        result = await cursor.fetchone()
+                        
+                        if result and result['leader_curse_until']:
+                            curse_until = result['leader_curse_until']
+                            if curse_until > datetime.now():
+                                await bot._send_error_embed(
+                                    interaction,
+                                    f"⚠️ Le leader est déjà sous l'effet d'une condamnation jusqu'au {curse_until.strftime('%d/%m/%Y à %H:%M')} !"
+                                )
+                                return
+                
+                # Check leader's shield
+                if await _check_and_consume_shield(leader_id):
+                    try:
+                        leader_user = await bot.fetch_user(leader_id)
+                        await leader_user.send(embed=discord.Embed(
+                            title="🛡️ Bouclier Activé !",
+                            description=f"Ton bouclier a absorbé la condamnation de **{interaction.user.display_name}** !",
+                            color=discord.Color.blue()
+                        ))
+                    except Exception:
+                        pass
+                    clan_info = bot.get_clan_info_for_user(character.get_level())
+                    await interaction.response.send_message(
+                        embed=discord.Embed(
+                            title="🛡️ Bouclier !",
+                            description=f"**Le leader** est protégé par un bouclier mystique ! Ta condamnation est absorbée.",
+                            color=discord.Color.blue()
+                        ),
+                        ephemeral=True
+                    )
+                    return
+
+                # Apply the curse - random 1-2 days
+                curse_days = random.choice([1, 2])
+                curse_until = datetime.now() + timedelta(days=curse_days)
+
+                # Fetch leader_user before pact mirror (needed for DM text)
+                try:
+                    leader_user = await bot.fetch_user(leader_id)
+                except Exception:
+                    leader_user = None
+                leader_display = leader_user.display_name if leader_user else f"#{leader_id}"
+
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor() as cursor:
+                        await cursor.execute(
+                            '''INSERT INTO egb_character_bonuses (discord_id, leader_curse_until)
+                               VALUES (%s, %s)
+                               ON DUPLICATE KEY UPDATE leader_curse_until = %s''',
+                            (leader_id, curse_until, curse_until)
+                        )
+                        await conn.commit()
+
+                # Mark ability as used
+                await bot.ability_manager.use_ability(interaction.user.id, 'entomb')
+
+                # Mirror entomb to leader's pact partner if any
+                leader_partner_id = await bot.pact_manager.get_active_pact_partner(leader_id)
+                if leader_partner_id:
+                    partner_blocked = await _check_and_consume_shield(leader_partner_id)
+                    if not partner_blocked:
+                        async with bot.mdb_con.acquire() as conn:
+                            async with conn.cursor() as cursor:
+                                await cursor.execute(
+                                    '''INSERT INTO egb_character_bonuses (discord_id, leader_curse_until)
+                                       VALUES (%s, %s)
+                                       ON DUPLICATE KEY UPDATE leader_curse_until = %s''',
+                                    (leader_partner_id, curse_until, curse_until)
+                                )
+                                await conn.commit()
+                        try:
+                            partner_user = await bot.fetch_user(leader_partner_id)
+                            partner_dm = discord.Embed(
+                                title="⚡ Condamnation Divine !",
+                                description=f"Ton pacte avec **{leader_display}** t'entraîne dans sa condamnation !\nTu ne pourras pas monter de niveau pendant **{curse_days} jour(s)** !",
+                                color=discord.Color.dark_red()
+                            )
+                            partner_dm.add_field(name="Levée de la condamnation", value=curse_until.strftime('%d/%m/%Y à %H:%M'), inline=False)
+                            await partner_user.send(embed=partner_dm)
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            partner_user = await bot.fetch_user(leader_partner_id)
+                            await partner_user.send(embed=discord.Embed(
+                                title="🛡️ Bouclier Activé !",
+                                description=f"Ton bouclier a absorbé la condamnation de **{interaction.user.display_name}** (transmise via le pacte de **{leader_display}**) !",
+                                color=discord.Color.blue()
+                            ))
+                        except Exception:
+                            pass
+
+                # Try to notify the leader
+                if leader_user:
+                    try:
+                        dm_embed = discord.Embed(
+                            title="⚡ Condamnation Divine !",
+                            description=f"L'Ancien t'a condamné ! Tu ne pourras pas monter de niveau pendant **{curse_days} jour(s)** !",
+                            color=discord.Color.dark_red()
+                        )
+                        dm_embed.add_field(
+                            name="Levée de la condamnation",
+                            value=curse_until.strftime('%d/%m/%Y à %H:%M'),
+                            inline=False
+                        )
+                        dm_embed.set_footer(text=f"Condamné par {interaction.user.display_name}")
+                        await leader_user.send(embed=dm_embed)
+                    except Exception:
+                        pass
+
+                # Send success message
+                clan_info = bot.get_clan_info_for_user(character.get_level())
+                embed = discord.Embed(
+                    title="⚡ Condamnation Lancée !",
+                    description=f"Tu as entomb **{leader_display}** (Niveau {leader.get_level()}) !\n\nIls ne pourront pas monter de niveau pendant **{curse_days} jour(s)** !",
+                    color=clan_info['color']
+                )
+                embed.add_field(
+                    name="Fin de la condamnation",
+                    value=curse_until.strftime('%d/%m/%Y à %H:%M'),
+                    inline=False
+                )
+                
+                await interaction.response.send_message(embed=embed, ephemeral=False)
+                await bot.log(interaction.user.id, datetime.now(), f'entomb {leader_id}')
+                
+            except Exception as e:
+                print(f"Error in entomb command: {e}", file=sys.stderr)
+                await bot._send_error_embed(interaction, "Une erreur est survenue.")
+        
+        # ===== BLESS (All levels) =====
+        @bot.tree.command(name="bless", description="Bénir un joueur pour lui donner un bonus de 3-8% au prochain levelup")
+        @app_commands.describe(target="Le joueur à bénir")
+        async def bless(interaction: discord.Interaction, target: discord.Member):
+            if not await bot._has_player_role(interaction.user):
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
+                return
+            
+            try:
+                # Check if target has player role
+                if not await bot._has_player_role(target):
+                    await bot._send_error_embed(
+                        interaction,
+                        f"**{target.display_name}** n'a pas le rôle **Joueur**."
+                    )
+                    return
+                
+                # Can't bless yourself
+                if target.id == interaction.user.id:
+                    await bot._send_error_embed(
+                        interaction,
+                        "Tu ne peux pas te bénir toi-même !"
+                    )
+                    return
+                
+                # Check cooldown (once per week)
+                can_use, msg = await bot.ability_manager.can_use_ability(
+                    interaction.user.id, 
+                    'bless', 
+                    cooldown_days=7
+                )
+                
+                if not can_use:
+                    await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {msg}")
+                    return
+                
+                # Give random 3-8% bonus (cumulative)
+                bonus = random.randint(3, 8)
+                
+                # Store bless effect
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor() as cursor:
+                        await cursor.execute(
+                            '''INSERT INTO egb_character_effects (discord_id, source_discord_id, effect_type, amount)
+                               VALUES (%s, %s, 'bless', %s)''',
+                            (target.id, interaction.user.id, bonus)
+                        )
+                        await conn.commit()
+                
+                # Mark ability as used
+                await bot.ability_manager.use_ability(interaction.user.id, 'bless')
+
+                target_partner_id = await bot.pact_manager.get_active_pact_partner(target.id)
+                if target_partner_id:
+                    async with bot.mdb_con.acquire() as conn:
+                        async with conn.cursor() as cursor:
+                            await cursor.execute(
+                                '''INSERT INTO egb_character_effects (discord_id, source_discord_id, effect_type, amount)
+                                   VALUES (%s, %s, 'bless', %s)''',
+                                (target_partner_id, interaction.user.id, bonus)
+                            )
+                            await conn.commit()
+                    try:
+                        partner_user = await bot.fetch_user(target_partner_id)
+                        await partner_user.send(embed=discord.Embed(
+                            title="✨ Pacte de Sang — Bénédiction",
+                            description=f"**{interaction.user.display_name}** a béni ton partenaire de pacte **{target.display_name}** !\nGrâce au pacte, tu reçois également **+{bonus}%** pour ton prochain levelup !",
+                            color=discord.Color.gold()
+                        ))
+                    except Exception:
+                        pass
+
+                # Get target's character
+                target_character = await bot.get_or_create_character(target.id)
+                
+                # Try to notify the target
+                try:
+                    target_clan = bot.get_clan_info_for_user(target_character.get_level())
+                    dm_embed = discord.Embed(
+                        title="✨ Bénédiction Reçue !",
+                        description=f"{interaction.user.display_name} t'a béni(e) !\nTu as reçu **+{bonus}%** de chance pour ton prochain levelup !",
+                        color=discord.Color.gold()
+                    )
+                    dm_embed.set_footer(text="Cette bénédiction est cumulative avec d'autres bonus")
+                    
+                    await target.send(embed=dm_embed)
+                except:
+                    pass  # If we can't DM them, that's okay
+                
+                # Send success message
+                character = await bot.get_or_create_character(interaction.user.id)
+                clan_info = bot.get_clan_info_for_user(character.get_level())
+                embed = discord.Embed(
+                    title="✨ Bénédiction Accordée !",
+                    description=f"Tu as béni **{target.display_name}** !\n\nIls ont reçu **+{bonus}%** de chance pour leur prochain levelup.",
+                    color=clan_info['color']
+                )
+                embed.set_footer(text="Les bénédictions sont cumulatives")
+                
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await bot.log(interaction.user.id, datetime.now(), f'bless {target.id} (+{bonus}%)')
+                
+            except Exception as e:
+                print(f"Error in bless command: {e}", file=sys.stderr)
+                await bot._send_error_embed(interaction, "Une erreur est survenue.")
+
+        @bot.tree.command(name="oppress", description="[LEADER ONLY] Infliger un malus à tous les autres joueurs pour la journée")
+        async def oppress(interaction: discord.Interaction):
+            if not await bot._has_player_role(interaction.user):
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
+                return
+            
+            try:
+                character = await bot.get_or_create_character(interaction.user.id)
+                
+                # Get the top player (leader)
+                top_characters = await bot.character_repo.get_top_characters(limit=1)
+                
+                if not top_characters:
+                    await bot._send_error_embed(interaction, "Aucun leader trouvé.")
+                    return
+                
+                leader = top_characters[0]
+                leader_id = leader.get_discord_id()
+                
+                # Check if user is the leader
+                if interaction.user.id != leader_id :
+                    await bot._send_error_embed(
+                        interaction,
+                        "⚠️ Seul le **Leader** peut utiliser cette capacité !"
+                    )
+                    return
+                
+                # Check cooldown (once per week) - GLOBAL cooldown
+                can_use, msg = await bot.ability_manager.can_use_ability(
+                    -1,  # Global key, not per-user
+                    'oppress', 
+                    cooldown_days=7
+                )
+                
+                if not can_use:
+                    await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {msg}")
+                    return
+                
+                # Calculate malus percentage (20-50%)
+                malus_percent = random.randint(20, 50)*-1
+                
+                # Calculate end of day (midnight tonight)
+                now = datetime.now()
+                end_of_day = datetime.combine(now.date(), datetime.max.time())
+                
+                # Apply malus to all players except the leader
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor() as cursor:
+                        # Apply to all existing players
+                        await cursor.execute(
+                            '''INSERT INTO egb_character_bonuses (discord_id, oppression_malus, oppression_until)
+                            SELECT discord_id, %s, %s FROM egb_characters WHERE discord_id != %s
+                            ON DUPLICATE KEY UPDATE 
+                                oppression_malus = VALUES(oppression_malus),
+                                oppression_until = VALUES(oppression_until)''',
+                            (malus_percent, end_of_day, leader_id)
+                        )
+                        affected_count = cursor.rowcount
+                        await conn.commit()
+                
+                # Mark ability as used
+                await bot.ability_manager.use_ability(leader_id, 'oppress')
+                
+                # Send success message
+                clan_info = bot.get_clan_info_for_user(character.get_level())
+                embed = discord.Embed(
+                    title="👑 Oppression du Leader !",
+                    description=f"Tu as infligé un malus de **{malus_percent}%** XP à tous les autres joueurs !",
+                    color=clan_info['color']
+                )
+                embed.add_field(
+                    name="⏰ Durée",
+                    value=f"Jusqu'à minuit ({end_of_day.strftime('%d/%m/%Y à %H:%M')})",
+                    inline=False
+                )
+                embed.add_field(
+                    name="👥 Joueurs affectés",
+                    value=f"{affected_count} joueur(s)",
+                    inline=False
+                )
+                
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await bot.log(interaction.user.id, datetime.now(), f'oppress {malus_percent}% until {end_of_day}')
+                
+            except Exception as e:
+                import sys
+                print(f"Error in oppress command: {e}", file=sys.stderr)
+                await bot._send_error_embed(interaction, "Une erreur est survenue.")
+
+        # ===== STEAL (Level 40+) =====
+        @bot.tree.command(name="steal", description="Siphonner 5-10% de chance du prochain levelup d'un joueur")
+        @app_commands.describe(target="Le joueur dont tu veux siphonner la chance")
+        async def steal(interaction: discord.Interaction, target: discord.Member):
+            if not await bot._has_player_role(interaction.user):
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
+                return
+
+            try:
+                character = await bot.get_or_create_character(interaction.user.id)
+
+                if character.get_level() < 40:
+                    await bot._send_error_embed(
+                        interaction,
+                        "Tu dois être niveau 40 minimum pour utiliser cette capacité."
+                    )
+                    return
+
+                if target.id == interaction.user.id:
+                    await bot._send_error_embed(interaction, "Tu ne peux pas te voler toi-même !")
+                    return
+
+                if not await bot._has_player_role(target):
+                    await bot._send_error_embed(interaction, f"**{target.display_name}** n'a pas le rôle **Joueur**.")
+                    return
+
+                # Check cooldown (rolling 24h)
+                can_use, msg = await bot.ability_manager.can_use_ability(
+                    interaction.user.id,
+                    'steal',
+                    cooldown_days=1
+                )
+
+                if not can_use:
+                    await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {msg}")
+                    return
+
+                amount = random.randint(5, 10)
+
+                # Check target's shield — blocks the entire steal
+                if await _check_and_consume_shield(target.id):
+                    await interaction.response.send_message(
+                        embed=discord.Embed(
+                            title="🛡️ Bouclier !",
+                            description=f"**{target.display_name}** est protégé par un bouclier mystique ! Ton siphonage est bloqué.",
+                            color=discord.Color.blue()
+                        ),
+                        ephemeral=True
+                    )
+                    try:
+                        await target.send(embed=discord.Embed(
+                            title="🛡️ Bouclier Activé !",
+                            description=f"Ton bouclier a bloqué le siphonage de **{interaction.user.display_name}** !",
+                            color=discord.Color.blue()
+                        ))
+                    except Exception:
+                        pass
+                    return
+
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor() as cursor:
+                        await cursor.execute(
+                            '''INSERT INTO egb_character_effects (discord_id, source_discord_id, effect_type, amount)
+                               VALUES (%s, %s, 'steal_bonus', %s)''',
+                            (interaction.user.id, target.id, amount)
+                        )
+                        await cursor.execute(
+                            '''INSERT INTO egb_character_effects (discord_id, source_discord_id, effect_type, amount)
+                               VALUES (%s, %s, 'steal_malus', %s)''',
+                            (target.id, interaction.user.id, amount)
+                        )
+                        await conn.commit()
+
+                await bot.ability_manager.use_ability(interaction.user.id, 'steal')
+
+                # Mirror steal_bonus to thief's pact partner
+                thief_partner_id = await bot.pact_manager.get_active_pact_partner(interaction.user.id)
+                if thief_partner_id:
+                    async with bot.mdb_con.acquire() as conn:
+                        async with conn.cursor() as cursor:
+                            await cursor.execute(
+                                '''INSERT INTO egb_character_effects (discord_id, source_discord_id, effect_type, amount)
+                                   VALUES (%s, %s, 'steal_bonus', %s)''',
+                                (thief_partner_id, target.id, amount)
+                            )
+                            await conn.commit()
+                    try:
+                        partner_user = await bot.fetch_user(thief_partner_id)
+                        await partner_user.send(embed=discord.Embed(
+                            title="🩸 Pacte de Sang — Vol d'Essence",
+                            description=f"Ton pacte avec **{interaction.user.display_name}** t'a transmis un vol sur **{target.display_name}** (**+{amount}%**) pour ton prochain levelup !",
+                            color=discord.Color.dark_red()
+                        ))
+                    except Exception:
+                        pass
+
+                # Mirror steal_malus to victim's pact partner
+                victim_partner_id = await bot.pact_manager.get_active_pact_partner(target.id)
+                if victim_partner_id:
+                    partner_blocked = await _check_and_consume_shield(victim_partner_id)
+                    if not partner_blocked:
+                        async with bot.mdb_con.acquire() as conn:
+                            async with conn.cursor() as cursor:
+                                await cursor.execute(
+                                    '''INSERT INTO egb_character_effects (discord_id, source_discord_id, effect_type, amount)
+                                       VALUES (%s, %s, 'steal_malus', %s)''',
+                                    (victim_partner_id, interaction.user.id, amount)
+                                )
+                                await conn.commit()
+                        try:
+                            partner_user = await bot.fetch_user(victim_partner_id)
+                            await partner_user.send(embed=discord.Embed(
+                                title="🩸 Pacte de Sang — Siphonage",
+                                description=f"Ton partenaire de pacte **{target.display_name}** s'est fait siphonner par **{interaction.user.display_name}** !\nGrâce au pacte, tu subis également **-{amount}%** pour ton prochain levelup.",
+                                color=discord.Color.dark_red()
+                            ))
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            partner_user = await bot.fetch_user(victim_partner_id)
+                            await partner_user.send(embed=discord.Embed(
+                                title="🛡️ Bouclier Activé !",
+                                description=f"Ton bouclier a absorbé le siphonage de **{interaction.user.display_name}** (transmis via le pacte de **{target.display_name}**) !",
+                                color=discord.Color.blue()
+                            ))
+                        except Exception:
+                            pass
+
+                try:
+                    target_embed = discord.Embed(
+                        title="🩸 Essence Siphonnée !",
+                        description=f"**{interaction.user.display_name}** t'a siphonné **{amount}%** de chance pour ton prochain levelup !",
+                        color=discord.Color.dark_red()
+                    )
+                    await target.send(embed=target_embed)
+                except Exception:
+                    pass
+
+                clan_info = bot.get_clan_info_for_user(character.get_level())
+                embed = discord.Embed(
+                    title="🩸 Vol d'Essence !",
+                    description=f"Tu as siphonné **+{amount}%** de chance à **{target.display_name}** !\nCe bonus s'appliquera à ta prochaine tentative de levelup.",
+                    color=clan_info['color']
+                )
+
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await bot.log(interaction.user.id, datetime.now(), f'steal {amount}% from {target.id}')
+
+            except Exception as e:
+                print(f"Error in steal command: {e}", file=sys.stderr)
+                await bot._send_error_embed(interaction, "Une erreur est survenue.")
+
+        # ===== PACT (Level 20+) =====
+        @bot.tree.command(name="pact", description="Sceller un Pacte de Sang avec un autre joueur pour 24h")
+        @app_commands.describe(target="Le joueur avec qui sceller le pacte")
+        async def pact(interaction: discord.Interaction, target: discord.Member):
+            if not await bot._has_player_role(interaction.user):
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
+                return
+
+            try:
+                character = await bot.get_or_create_character(interaction.user.id)
+
+                if character.get_level() < 20:
+                    await bot._send_error_embed(
+                        interaction,
+                        "Tu dois être niveau 20 minimum pour sceller un Pacte de Sang."
+                    )
+                    return
+
+                if target.id == interaction.user.id:
+                    await bot._send_error_embed(interaction, "Tu ne peux pas sceller un pacte avec toi-même !")
+                    return
+
+                if not await bot._has_player_role(target):
+                    await bot._send_error_embed(interaction, f"**{target.display_name}** n'a pas le rôle **Joueur**.")
+                    return
+
+                # Check requester cooldown (24h)
+                can_use, msg = await bot.ability_manager.can_use_ability(
+                    interaction.user.id, 'pact', cooldown_days=1
+                )
+                if not can_use:
+                    await bot._send_cd_msg_embed(interaction, f"Pacte en cooldown. {msg}")
+                    return
+
+                # Check target cooldown (24h)
+                can_target, _ = await bot.ability_manager.can_use_ability(
+                    target.id, 'pact', cooldown_days=1
+                )
+                if not can_target:
+                    await bot._send_error_embed(
+                        interaction,
+                        f"**{target.display_name}** a déjà scellé un pacte récemment et ne peut pas en former un nouveau."
+                    )
+                    return
+
+                # Check requester has no pending or active pact
+                if interaction.user.id in bot.pending_pacts:
+                    await bot._send_error_embed(interaction, "Tu as déjà une proposition de pacte en attente !")
+                    return
+
+                existing_partner_id = await bot.pact_manager.get_active_pact_partner(interaction.user.id)
+                if existing_partner_id:
+                    existing = interaction.guild.get_member(existing_partner_id)
+                    name = existing.display_name if existing else f"#{existing_partner_id}"
+                    await bot._send_error_embed(
+                        interaction,
+                        f"Tu es déjà lié par un Pacte de Sang avec **{name}** !"
+                    )
+                    return
+
+                # Check target has no pending or active pact
+                if target.id in bot.pending_pacts:
+                    await bot._send_error_embed(
+                        interaction,
+                        f"**{target.display_name}** a déjà une proposition de pacte en attente !"
+                    )
+                    return
+
+                target_partner_id = await bot.pact_manager.get_active_pact_partner(target.id)
+                if target_partner_id:
+                    other = interaction.guild.get_member(target_partner_id)
+                    name = other.display_name if other else f"#{target_partner_id}"
+                    await bot._send_error_embed(
+                        interaction,
+                        f"**{target.display_name}** a déjà scellé un pacte avec **{name}** !"
+                    )
+                    return
+
+                clan_info = bot.get_clan_info_for_user(character.get_level())
+                prompt_embed = discord.Embed(
+                    title="🩸 Pacte de Sang",
+                    description=(
+                        f"**{interaction.user.display_name}** te propose un **Pacte de Sang** !\n\n"
+                        f"Pendant 24h, vous partagerez bonus et malus.\n"
+                        f"Chaque level up réussi vous accordera un niveau à tous les deux.\n\n"
+                        f"Tu as **60 secondes** pour accepter ou refuser."
+                    ),
+                    color=clan_info['color']
+                )
+
+                view = PactView(
+                    bot=bot,
+                    requester=interaction.user,
+                    target=target,
+                    timeout=60
+                )
+
+                try:
+                    pact_msg = await target.send(embed=prompt_embed, view=view)
+                    view.message = pact_msg
+                    bot.pending_pacts.add(interaction.user.id)
+                    bot.pending_pacts.add(target.id)
+                    await interaction.response.send_message(
+                        f"Proposition de pacte envoyée à **{target.display_name}** en message privé !",
+                        ephemeral=True
+                    )
+                except discord.Forbidden:
+                    await bot._send_error_embed(
+                        interaction,
+                        f"Impossible d'envoyer un message privé à **{target.display_name}**. Leurs DMs sont peut-être fermés."
+                    )
+
+            except Exception as e:
+                print(f"Error in pact command: {e}", file=sys.stderr)
+                await bot._send_error_embed(interaction, "Une erreur est survenue.")
+
+
+        # ===== SHIELD (Level 50+) =====
+        @bot.tree.command(name="shield", description="Activer un bouclier mystique qui absorbe le prochain malus reçu (24h)")
+        async def shield(interaction: discord.Interaction):
+            if not await bot._has_player_role(interaction.user):
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
+                return
+
+            try:
+                character = await bot.get_or_create_character(interaction.user.id)
+
+                if character.get_level() < 50:
+                    await bot._send_error_embed(
+                        interaction,
+                        "Tu dois être niveau 50 minimum pour utiliser cette capacité."
+                    )
+                    return
+
+                # Check cooldown (7 days)
+                can_use, msg = await bot.ability_manager.can_use_ability(
+                    interaction.user.id, 'shield', cooldown_days=7
+                )
+                if not can_use:
+                    await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {msg}")
+                    return
+
+                shield_until = datetime.now() + timedelta(hours=24)
+
+                # Check if already has active shield
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cursor:
+                        await cursor.execute(
+                            'SELECT shield_until FROM egb_character_bonuses WHERE discord_id = %s',
+                            (interaction.user.id,)
+                        )
+                        existing = await cursor.fetchone()
+
+                already_shielded = existing and existing.get('shield_until') and existing['shield_until'] > datetime.now()
+
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor() as cursor:
+                        await cursor.execute(
+                            '''INSERT INTO egb_character_bonuses (discord_id, shield_until)
+                               VALUES (%s, %s)
+                               ON DUPLICATE KEY UPDATE shield_until = %s''',
+                            (interaction.user.id, shield_until, shield_until)
+                        )
+                        await conn.commit()
+
+                await bot.ability_manager.use_ability(interaction.user.id, 'shield')
+
+                clan_info = bot.get_clan_info_for_user(character.get_level())
+                if already_shielded:
+                    desc = f"Tu avais déjà un bouclier actif. Sa durée a été rafraîchie jusqu'au **{shield_until.strftime('%d/%m/%Y à %H:%M')}**."
+                else:
+                    desc = (
+                        f"Tu es protégé par un bouclier mystique jusqu'au **{shield_until.strftime('%d/%m/%Y à %H:%M')}** !\n"
+                        f"Le prochain malus que tu reçois (malédiction, siphonage, condamnation) sera absorbé."
+                    )
+
+                embed = discord.Embed(
+                    title="🛡️ Bouclier Mystique !",
+                    description=desc,
+                    color=clan_info['color']
+                )
+
+                # Mirror to pact partner
+                partner_id = await bot.pact_manager.get_active_pact_partner(interaction.user.id)
+                if partner_id:
+                    async with bot.mdb_con.acquire() as conn:
+                        async with conn.cursor(aiomysql.DictCursor) as cursor:
+                            await cursor.execute(
+                                'SELECT shield_until FROM egb_character_bonuses WHERE discord_id = %s',
+                                (partner_id,)
+                            )
+                            partner_existing = await cursor.fetchone()
+
+                    partner_already_shielded = (
+                        partner_existing
+                        and partner_existing.get('shield_until')
+                        and partner_existing['shield_until'] > datetime.now()
+                    )
+
+                    async with bot.mdb_con.acquire() as conn:
+                        async with conn.cursor() as cursor:
+                            await cursor.execute(
+                                '''INSERT INTO egb_character_bonuses (discord_id, shield_until)
+                                   VALUES (%s, %s)
+                                   ON DUPLICATE KEY UPDATE shield_until = %s''',
+                                (partner_id, shield_until, shield_until)
+                            )
+                            await conn.commit()
+
+                    try:
+                        partner_user = await bot.fetch_user(partner_id)
+                        if partner_already_shielded:
+                            partner_dm = discord.Embed(
+                                title="🛡️ Bouclier Rafraîchi !",
+                                description=f"Ton pacte avec **{interaction.user.display_name}** a rafraîchi ton bouclier jusqu'au **{shield_until.strftime('%d/%m/%Y à %H:%M')}** !",
+                                color=discord.Color.blue()
+                            )
+                        else:
+                            partner_dm = discord.Embed(
+                                title="🛡️ Pacte de Sang — Bouclier Transmis !",
+                                description=f"Ton pacte avec **{interaction.user.display_name}** t'a transmis un bouclier mystique !\nTu es protégé jusqu'au **{shield_until.strftime('%d/%m/%Y à %H:%M')}**.",
+                                color=discord.Color.blue()
+                            )
+                        await partner_user.send(embed=partner_dm)
+                    except Exception:
+                        pass
+
+                    partner_member = interaction.guild.get_member(partner_id)
+                    partner_name = partner_member.display_name if partner_member else f"#{partner_id}"
+                    partner_note = "rafraîchi" if partner_already_shielded else "transmis"
+                    embed.add_field(
+                        name="🩸 Pacte de Sang",
+                        value=f"Ton bouclier a été {partner_note} à **{partner_name}** via le pacte.",
+                        inline=False
+                    )
+
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await bot.log(interaction.user.id, datetime.now(), f'shield (until {shield_until})')
+
+            except Exception as e:
+                print(f"Error in shield command: {e}", file=sys.stderr)
+                await bot._send_error_embed(interaction, "Une erreur est survenue.")
+
+
+class PactView(discord.ui.View):
+    """Ephemeral accept/decline buttons sent to the public channel."""
+
+    def __init__(self, bot, requester: discord.Member, target: discord.Member, timeout: int):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.requester = requester
+        self.target = target
+        self.message = None  # set after send so we can edit it on timeout
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.target.id:
+            await interaction.response.send_message(
+                "Seul le joueur ciblé peut répondre à cette proposition.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Accepter", style=discord.ButtonStyle.success, emoji="🩸")
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        try:
+            expires_at = await self.bot.pact_manager.create_pact(self.requester.id, self.target.id)
+            await self.bot.ability_manager.use_ability(self.requester.id, 'pact')
+            await self.bot.ability_manager.use_ability(self.target.id, 'pact')
+
+            req_clan = self.bot.get_clan_info_for_user(
+                (await self.bot.get_or_create_character(self.requester.id)).get_level()
+            )
+            embed = discord.Embed(
+                title="🩸 Pacte de Sang Scellé !",
+                description=(
+                    f"**{self.requester.display_name}** et **{self.target.display_name}** "
+                    f"sont désormais liés par le sang !\n\n"
+                    f"Le pacte expire le **{expires_at.strftime('%d/%m/%Y à %H:%M')}**."
+                ),
+                color=req_clan['color']
+            )
+            self.bot.pending_pacts.discard(self.requester.id)
+            self.bot.pending_pacts.discard(self.target.id)
+            await interaction.response.edit_message(embed=embed, view=None)
+            try:
+                await self.requester.send(embed=embed)
+            except Exception:
+                pass
+            await self.bot.log(self.target.id, datetime.now(), f'pact accepted with {self.requester.id}')
+        except Exception as e:
+            print(f"Error accepting pact: {e}", file=sys.stderr)
+            await interaction.response.edit_message(content="Une erreur est survenue.", embed=None, view=None)
+
+    @discord.ui.button(label="Refuser", style=discord.ButtonStyle.danger, emoji="💀")
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        self.bot.pending_pacts.discard(self.requester.id)
+        self.bot.pending_pacts.discard(self.target.id)
+        embed = discord.Embed(
+            title="💀 Pacte Refusé",
+            description=f"**{self.target.display_name}** a refusé ton Pacte de Sang.",
+            color=discord.Color.dark_grey()
+        )
+        await interaction.response.edit_message(
+            embed=discord.Embed(
+                title="💀 Pacte Refusé",
+                description=f"Tu as refusé le Pacte de Sang de **{self.requester.display_name}**.",
+                color=discord.Color.dark_grey()
+            ),
+            view=None
+        )
+        try:
+            await self.requester.send(embed=embed)
+        except Exception:
+            pass
+        await self.bot.log(self.target.id, datetime.now(), f'pact declined from {self.requester.id}')
+
+    async def on_timeout(self):
+        self.bot.pending_pacts.discard(self.requester.id)
+        self.bot.pending_pacts.discard(self.target.id)
+        if self.message:
+            try:
+                await self.message.edit(
+                    embed=discord.Embed(
+                        title="⌛ Pacte Expiré",
+                        description=f"Tu n'as pas répondu à temps. La proposition de **{self.requester.display_name}** est annulée.",
+                        color=discord.Color.dark_grey()
+                    ),
+                    view=None
+                )
+            except Exception:
+                pass
+        try:
+            await self.requester.send(
+                embed=discord.Embed(
+                    title="⌛ Pacte Expiré",
+                    description=f"**{self.target.display_name}** n'a pas répondu à temps. Le pacte est annulé.",
+                    color=discord.Color.dark_grey()
+                )
+            )
+        except Exception:
+            pass
