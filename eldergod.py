@@ -74,9 +74,8 @@ class ElderGod(commands.Bot):
     async def on_ready(self):
         """Event handler when bot is ready"""
         try:
-            guild_id = int(os.getenv('GUILD_ID', '1291793636996157562'))
-            sc = await self.tree.sync(guild=discord.Object(id=guild_id))
-            print(f"Synced {len(sc)} commands to guild", file=sys.stdout)
+            sc = await self.tree.sync()
+            print(f"Synced {len(sc)} commands globally", file=sys.stdout)
         except Exception as e:
             print(f"Error syncing commands: {e}", file=sys.stderr)
 
