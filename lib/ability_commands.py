@@ -477,7 +477,9 @@ class AbilityCommands:
             if not await bot._has_player_role(interaction.user):
                 await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
                 return
-            
+
+            await interaction.response.defer(ephemeral=True)
+
             try:
                 character = await bot.get_or_create_character(interaction.user.id)
                 
@@ -525,12 +527,12 @@ class AbilityCommands:
                     except:
                         pass
                 
-                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await interaction.followup.send(embed=embed, ephemeral=True)
                 await bot.log(interaction.user.id, datetime.now(), 'spectral (view leaderboard)')
-                
+
             except Exception as e:
                 print(f"Error in spectral command: {e}")
-                await bot._send_error_embed(interaction, "Une erreur est survenue.")
+                await interaction.followup.send("❌ Une erreur est survenue.", ephemeral=True)
 
         # ===== entomb (Level 10+) =====
         @app_commands.guild_only()
@@ -1544,13 +1546,19 @@ class RulesView(discord.ui.View):
     async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current -= 1
         self._update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+        try:
+            await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+        except discord.errors.NotFound:
+            await interaction.message.edit(embed=self.pages[self.current], view=self)
 
     @discord.ui.button(label="Suivant ▶", style=discord.ButtonStyle.secondary)
     async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current += 1
         self._update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+        try:
+            await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+        except discord.errors.NotFound:
+            await interaction.message.edit(embed=self.pages[self.current], view=self)
 
 
 class PactView(discord.ui.View):
