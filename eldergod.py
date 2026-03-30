@@ -71,6 +71,19 @@ class ElderGod(commands.Bot):
                 print(f"Error setting up database: {e}", file=sys.stderr)
                 raise
 
+        @self.tree.error
+        async def on_tree_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+            if isinstance(error, app_commands.NoPrivateMessage):
+                try:
+                    await interaction.response.send_message(
+                        "❌ Cette commande ne peut être utilisée que dans un serveur.",
+                        ephemeral=True
+                    )
+                except Exception:
+                    pass
+                return
+            print(f"Unhandled tree error: {error}", file=sys.stderr)
+
     async def on_ready(self):
         """Event handler when bot is ready"""
         try:
