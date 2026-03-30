@@ -17,7 +17,7 @@ def main():
         'DB_MDB',
         'DB_MDB_USER',
         'DB_MDB_USER_PWD',
-        'TEST_CHANNEL_ID',
+        'CLAVARDEUR_ID',
         'DEFAULT_LANGUAGE',
         'GUILD_ID'
     ]

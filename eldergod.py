@@ -36,7 +36,7 @@ class ElderGod(commands.Bot):
     async def on_member_join(self, member):
         """Event handler when a new member joins the server"""
         try:
-            channel_id = int(os.getenv('TEST_CHANNEL_ID'))
+            channel_id = int(os.getenv('CLAVARDEUR_ID'))
             channel = self.get_channel(channel_id)
 
             if channel:
@@ -575,7 +575,7 @@ class ElderGod(commands.Bot):
                     if wings_role and wings_role in target_user.roles:
                         embed.add_field(name="✨ Ailes", value=wings_role.mention, inline=True)
 
-                await interaction.response.send_message(embed=embed, ephemeral=False)
+                await self._send_public(interaction, embed)
             except Exception as e:
                 print(f"Error in profile command: {e}", file=sys.stderr)
                 await self._send_error_embed(
@@ -736,6 +736,20 @@ class ElderGod(commands.Bot):
             print(f"Cannot send DM to {user.name}", file=sys.stderr)
         except Exception as e:
             print(f"Error sending admin DM: {e}", file=sys.stderr)
+
+    async def _send_public(self, interaction: discord.Interaction, embed: discord.Embed):
+        """
+        Send a public embed. If COMMANDS_CHANNEL_ID is set, posts to that channel
+        and acknowledges the interaction ephemerally. Otherwise sends publicly in place.
+        """
+        commands_channel_id = os.getenv('COMMANDS_CHANNEL_ID', '').strip()
+        if commands_channel_id:
+            channel = interaction.guild.get_channel(int(commands_channel_id))
+            if channel:
+                await channel.send(embed=embed)
+                await interaction.response.send_message("✅", ephemeral=True, delete_after=1)
+                return
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
     async def _has_player_role(self, member: discord.Member) -> bool:
         """Check if user has the 'Joueur' role"""

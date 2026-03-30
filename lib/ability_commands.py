@@ -725,7 +725,7 @@ class AbilityCommands:
                     inline=False
                 )
                 
-                await interaction.response.send_message(embed=embed, ephemeral=False)
+                await bot._send_public(interaction, embed)
                 await bot.log(interaction.user.id, datetime.now(), f'entomb {leader_id}')
                 
             except Exception as e:

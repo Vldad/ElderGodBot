@@ -44,7 +44,8 @@ DB_MDB_HOST     # défaut: localhost
 DB_MDB_PORT     # défaut: 3306
 DB_MDB_USER
 DB_MDB_USER_PWD
-TEST_CHANNEL_ID  # channel pour le message de bienvenue
+CLAVARDEUR_ID    # channel pour le message de bienvenue (on_member_join)
+COMMANDS_CHANNEL_ID  # channel pour les messages publics (/profile, /entomb) — optionnel, si vide les messages sont envoyés sur place
 DEFAULT_LANGUAGE # 'fr' ou 'en'
 GUILD_ID
 
