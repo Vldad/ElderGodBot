@@ -89,6 +89,7 @@ class ElderGod(commands.Bot):
         AbilityCommands.register_commands(self)
 
         # ===== QUOTE COMMAND =====
+        @app_commands.guild_only()
         @self.tree.command(name="quote", description="Affiche une citation aléatoire de l'univers LoK")
         @app_commands.describe(character="Qui l'a dit ?")
         @app_commands.describe(lang=f"Langue de la citation : en | fr. Par défaut : {os.getenv('DEFAULT_LANGUAGE', 'fr')}")
@@ -138,6 +139,7 @@ class ElderGod(commands.Bot):
             return data[:25]
 
         # ===== LEVELUP COMMAND =====
+        @app_commands.guild_only()
         @self.tree.command(name="levelup", description="Tenter de monter de niveau")
         async def levelup(interaction: discord.Interaction):
             # Check if user has "Joueur" role
@@ -311,6 +313,7 @@ class ElderGod(commands.Bot):
                 )
 
         # ===== STATS COMMAND =====
+        @app_commands.guild_only()
         @self.tree.command(name="stats", description="Voir vos statistiques de personnage")
         async def stats(interaction: discord.Interaction):
             if not await self._has_player_role(interaction.user):
@@ -530,6 +533,7 @@ class ElderGod(commands.Bot):
                 )
 
         # ===== PROFILE COMMAND (public version of stats) =====
+        @app_commands.guild_only()
         @self.tree.command(name="profile", description="Voir le profil public d'un joueur")
         @app_commands.describe(user="Le joueur dont tu veux voir le profil")
         async def profile(interaction: discord.Interaction, user: Optional[discord.Member] = None):

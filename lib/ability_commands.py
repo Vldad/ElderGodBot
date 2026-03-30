@@ -18,6 +18,7 @@ class AbilityCommands:
         """Register all ability commands to the bot"""
         
         # ===== CHAUSSETTE (Level 5+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="chaussette", description="Crier CHAUSSETTE pour un level gratuit par semaine")
         async def chaussette(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
@@ -115,6 +116,7 @@ class AbilityCommands:
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
 
         # ===== DEVOUR (Level 5+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="devour", description="Dévorer les âmes pour un bonus d'XP")
         async def devour(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
@@ -195,6 +197,7 @@ class AbilityCommands:
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
         
         # ===== SWIM (Level 20+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="swim", description="Contourner le cooldown quotidien une fois par semaine")
         async def swim(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
@@ -279,6 +282,7 @@ class AbilityCommands:
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
             
         # ===== CURSE (Level 10+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="curse", description="Maudire un autre joueur (-5% sur sa prochaine tentative)")
         @app_commands.describe(target="Le joueur à maudire")
         async def curse(interaction: discord.Interaction, target: discord.Member):
@@ -408,6 +412,7 @@ class AbilityCommands:
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
                       
         # ===== EVOLVE (Level 30+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="evolve", description="Obtenir les ailes de Raziel (rôle cosmétique)")
         async def evolve(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
@@ -466,6 +471,7 @@ class AbilityCommands:
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
         
         # ===== SPECTRAL (Level 30+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="spectral", description="Voir le royaume spectral (classement caché)")
         async def spectral(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
@@ -527,6 +533,7 @@ class AbilityCommands:
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
 
         # ===== entomb (Level 10+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="entomb", description="Condamner le leader à ne pas pouvoir levelup pendant 1-2 jours")
         async def entomb(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
@@ -712,6 +719,7 @@ class AbilityCommands:
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
         
         # ===== BLESS (All levels) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="bless", description="Bénir un joueur pour lui donner un bonus de 3-8% au prochain levelup")
         @app_commands.describe(target="Le joueur à bénir")
         async def bless(interaction: discord.Interaction, target: discord.Member):
@@ -817,6 +825,7 @@ class AbilityCommands:
                 print(f"Error in bless command: {e}", file=sys.stderr)
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
 
+        @app_commands.guild_only()
         @bot.tree.command(name="oppress", description="[LEADER ONLY] Infliger un malus à tous les autres joueurs pour la journée")
         async def oppress(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
@@ -907,6 +916,7 @@ class AbilityCommands:
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
 
         # ===== STEAL (Level 40+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="steal", description="Siphonner 5-10% de chance du prochain levelup d'un joueur")
         @app_commands.describe(target="Le joueur dont tu veux siphonner la chance")
         async def steal(interaction: discord.Interaction, target: discord.Member):
@@ -1060,6 +1070,7 @@ class AbilityCommands:
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
 
         # ===== PACT (Level 20+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="pact", description="Sceller un Pacte de Sang avec un autre joueur pour 24h")
         @app_commands.describe(target="Le joueur avec qui sceller le pacte")
         async def pact(interaction: discord.Interaction, target: discord.Member):
@@ -1177,6 +1188,7 @@ class AbilityCommands:
 
 
         # ===== SHIELD (Level 50+) =====
+        @app_commands.guild_only()
         @bot.tree.command(name="shield", description="Activer un bouclier mystique qui absorbe le prochain malus reçu (24h)")
         async def shield(interaction: discord.Interaction):
             if not await bot._has_player_role(interaction.user):
@@ -1503,6 +1515,7 @@ class AbilityCommands:
         for i, page in enumerate(RULES_PAGES):
             page.set_footer(text=f"Page {i + 1}/{len(RULES_PAGES)}")
 
+        @app_commands.guild_only()
         @bot.tree.command(name="rules", description="Afficher les règles et commandes du bot")
         async def rules(interaction: discord.Interaction):
             try:
