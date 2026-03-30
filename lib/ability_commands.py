@@ -1374,7 +1374,7 @@ class AbilityCommands:
             ),
         ]
 
-        RULES_PAGES[1].add_field(name="/levelup", inline=False, value=(
+        RULES_PAGES[1].add_field(name="🎲 /levelup", inline=False, value=(
             "Tente de monter de niveau.\n"
             "• Chance de base : **20%** (+5%/heure d'attente, max 80%)\n"
             "• Cooldown : **1h** entre chaque tentative\n"
@@ -1382,19 +1382,19 @@ class AbilityCommands:
             "• Les bonus/malus actifs s'appliquent au moment du jet\n"
             "• En cas de succès, le partenaire de pacte gagne également un niveau"
         ))
-        RULES_PAGES[1].add_field(name="/stats", inline=False, value=(
+        RULES_PAGES[1].add_field(name="🦇 /stats", inline=False, value=(
             "Affiche ton profil privé.\n"
             "• Niveau, clan, rôle\n"
             "• Cooldowns de toutes tes capacités\n"
             "• Tous les effets actifs (bless, curse, devour, steal, oppression, bouclier, nage)\n"
             "• Chance de succès actuelle au prochain `/levelup`"
         ))
-        RULES_PAGES[1].add_field(name="/profile [@joueur]", inline=False, value=(
+        RULES_PAGES[1].add_field(name="🦇 /profile [@joueur]", inline=False, value=(
             "Affiche le profil **public** d'un joueur (ou le tien si aucun joueur mentionné).\n"
             "• Niveau et clan visibles par tous\n"
             "• Sans les détails privés (effets actifs, cooldowns)"
         ))
-        RULES_PAGES[1].add_field(name="/bless @joueur", inline=False, value=(
+        RULES_PAGES[1].add_field(name="✨ /bless @joueur", inline=False, value=(
             "Bénit un joueur pour lui donner un bonus sur son prochain `/levelup`.\n"
             "• Bonus : **+3 à +8%** (aléatoire, cumulatif)\n"
             "• Cooldown : **7 jours** par lanceur\n"
@@ -1409,13 +1409,13 @@ class AbilityCommands:
             "• Accessible à tous, sans cooldown"
         ))
 
-        RULES_PAGES[2].add_field(name="/devour", inline=False, value=(
+        RULES_PAGES[2].add_field(name="🩸 /devour", inline=False, value=(
             "Dévore une âme pour obtenir un bonus sur ton prochain `/levelup`.\n"
             "• Bonus : **+3 à +8%** (cumulatif)\n"
             "• Cooldown : **1 jour**\n"
             "• Si tu as un pacte, ton partenaire reçoit le même bonus automatiquement"
         ))
-        RULES_PAGES[2].add_field(name="/chaussette", inline=False, value=(
+        RULES_PAGES[2].add_field(name="🧦 /chaussette", inline=False, value=(
             "Crie CHAUSSETTE pour obtenir un **level up gratuit garanti**.\n"
             "• Aucun jet de dés — le niveau est accordé directement\n"
             "• Cooldown : **7 jours**\n"
@@ -1423,7 +1423,7 @@ class AbilityCommands:
             "• Si tu as un pacte, ton partenaire gagne également un niveau"
         ))
 
-        RULES_PAGES[3].add_field(name="/curse @joueur", inline=False, value=(
+        RULES_PAGES[3].add_field(name="💀 /curse @joueur", inline=False, value=(
             "Maudit un joueur pour réduire ses chances au prochain `/levelup`.\n"
             "• Malus : **-5%** (cumulatif)\n"
             "• Cooldown : **7 jours** par lanceur\n"
@@ -1432,7 +1432,7 @@ class AbilityCommands:
             "• Bloqué par le **bouclier** de la cible\n"
             "• Impossible de se maudire soi-même"
         ))
-        RULES_PAGES[3].add_field(name="/entomb", inline=False, value=(
+        RULES_PAGES[3].add_field(name="⚡ /entomb", inline=False, value=(
             "Condamne le joueur avec le niveau le plus élevé (le leader).\n"
             "• Durée : **1 ou 2 jours** (aléatoire) — le leader ne peut pas faire `/levelup`\n"
             "• Cooldown : **7 jours GLOBAL** (partagé par tout le serveur)\n"
@@ -1447,14 +1447,14 @@ class AbilityCommands:
             "Tu conserves toutes les capacités acquises et continues ta progression vers le clan Rahabim."
         ))
 
-        RULES_PAGES[5].add_field(name="/swim", inline=False, value=(
+        RULES_PAGES[5].add_field(name="🌊 /swim", inline=False, value=(
             "Contourne le cooldown quotidien de `/levelup` une fois.\n"
             "• Permet de tenter un level up même si tu as déjà réussi aujourd'hui\n"
             "• Ne contourne pas le cooldown d'1 heure entre tentatives\n"
             "• Cooldown : **7 jours**\n"
             "• Si tu as un pacte, ton partenaire reçoit également le bonus de nage"
         ))
-        RULES_PAGES[5].add_field(name="/pact @joueur", inline=False, value=(
+        RULES_PAGES[5].add_field(name="🩸 /pact @joueur", inline=False, value=(
             "Scelle un **Pacte de Sang** avec un autre joueur pendant 24h.\n"
             "• Le joueur ciblé reçoit une demande en DM avec **1 heure** pour accepter ou refuser\n"
             "• Effets du pacte :\n"
@@ -1465,18 +1465,18 @@ class AbilityCommands:
             "• Impossible de se pacifier soi-même"
         ))
 
-        RULES_PAGES[6].add_field(name="/evolve", inline=False, value=(
+        RULES_PAGES[6].add_field(name="👼 /evolve", inline=False, value=(
             "Obtiens le rôle cosmétique **Ailes** de Raziel.\n"
             "• Rôle décoratif uniquement, aucun effet en jeu\n"
             "• Utilisable une seule fois — pas de cooldown"
         ))
-        RULES_PAGES[6].add_field(name="/spectral", inline=False, value=(
+        RULES_PAGES[6].add_field(name="👁️ /spectral", inline=False, value=(
             "Révèle le **Royaume Spectral** : classement des 10 joueurs les plus puissants.\n"
             "• Affiche : niveau, clan, dernière tentative, chance de succès actuelle\n"
             "• Informations normalement cachées — pas de cooldown"
         ))
 
-        RULES_PAGES[7].add_field(name="/steal @joueur", inline=False, value=(
+        RULES_PAGES[7].add_field(name="🩸 /steal @joueur", inline=False, value=(
             "Siphonne une partie de la chance d'un joueur pour te l'approprier.\n"
             "• Montant : **5 à 10%** (aléatoire)\n"
             "• La cible perd ce % sur son prochain levelup, tu le gagnes sur le tien\n"
@@ -1487,7 +1487,7 @@ class AbilityCommands:
             "• Bloqué par le **bouclier** de la cible\n"
             "• Impossible de se voler soi-même"
         ))
-        RULES_PAGES[7].add_field(name="/oppress  ⚠️ Leader uniquement", inline=False, value=(
+        RULES_PAGES[7].add_field(name="👑 /oppress  ⚠️ Leader uniquement", inline=False, value=(
             "Inflige un malus massif à **tous les autres joueurs** jusqu'à minuit.\n"
             "• Malus : **-20 à -50%** (aléatoire, appliqué à tous sauf le leader)\n"
             "• Cooldown : **7 jours GLOBAL**\n"
@@ -1495,7 +1495,7 @@ class AbilityCommands:
             "• Non bloqué par le bouclier"
         ))
 
-        RULES_PAGES[8].add_field(name="/shield", inline=False, value=(
+        RULES_PAGES[8].add_field(name="🛡️ /shield", inline=False, value=(
             "Active un **bouclier mystique** qui absorbe le prochain malus reçu.\n"
             "• Durée : **24h** (ou jusqu'à absorption d'un malus)\n"
             "• Protège contre : `/curse`, `/steal` (malus), `/entomb`\n"
@@ -1509,7 +1509,7 @@ class AbilityCommands:
             "• Toutes les réponses du bot sont **privées** sauf `/profile` et `/entomb`\n"
             "• Les effets (bless, curse, devour, steal) sont **effacés après chaque `/levelup`**\n"
             "• `/stats` affiche tous tes effets actifs et leurs sources\n"
-            "• En cas de problème, contacte un administrateur"
+            "• En cas de problème, contacte <@340193200608116746>"
         ))
 
         for i, page in enumerate(RULES_PAGES):
