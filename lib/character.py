@@ -26,23 +26,15 @@ class Character:
         return self._lastSuccessfulLevelup
     
     # Business Logic
-    def can_attempt_levelup(self, cooldown_hours: int = 1, has_swim_bonus: bool = False, has_chaussette_bonus: bool = False, has_freeze_malus: bool = False) -> tuple[bool, str]:
+    def can_attempt_levelup(self, cooldown_hours: int = 1, has_swim_bonus: bool = False) -> tuple[bool, str]:
         """
         Check if user can attempt levelup
-        has_swim_bonus: If True, bypasses all cooldowns
+        has_swim_bonus: If True, bypasses daily cooldown
         Returns: (can_attempt: bool, message: str)
         """
         # Swim bonus bypasses all checks
         if has_swim_bonus:
             return True, "Bonus Nage actif !"
-        
-        # Chaussette bonus bypasses all checks
-        if has_chaussette_bonus:
-            return True, "Bonus Chaussette actif !"
-        
-        # Entomb malus bypasses all checks
-        if has_freeze_malus:
-            return False, "Malus Entomb actif !"
 
         today = date.today()
         
@@ -82,14 +74,14 @@ class Character:
         bonus = min(hours_since_last * bonus_per_hour, max_chance - base_chance)
         return min(base_chance + bonus, max_chance)
 
-    def attempt_to_levelup(self, base_chance: int = 20, bonus_per_hour: int = 5, 
-                          max_chance: int = 80, flat_chance: int = 0, cooldown_hours: int = 1, has_swim_bonus: bool = False, has_chaussette_bonus: bool = False, has_freeze_malus: bool = False) -> tuple[bool, str, float]:
+    def attempt_to_levelup(self, base_chance: int = 20, bonus_per_hour: int = 5,
+                          max_chance: int = 80, flat_chance: int = 0, cooldown_hours: int = 1, has_swim_bonus: bool = False) -> tuple[bool, str, float]:
         """
         Attempt to level up the character
         has_swim_bonus: If True, bypasses cooldown checks
         Returns: (success: bool, message: str, probability: float)
         """
-        can_attempt, msg = self.can_attempt_levelup(cooldown_hours, has_swim_bonus, has_chaussette_bonus, has_freeze_malus)
+        can_attempt, msg = self.can_attempt_levelup(cooldown_hours, has_swim_bonus)
         if not can_attempt:
             return False, msg, 0
                

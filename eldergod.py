@@ -75,9 +75,8 @@ class ElderGod(commands.Bot):
         """Event handler when bot is ready"""
         try:
             guild_id = int(os.getenv('GUILD_ID', '1291793636996157562'))
-            await self.tree.sync(guild=discord.Object(id=guild_id))
-            sc = await self.tree.sync()
-            print(f"Synced {len(sc)} commands globally", file=sys.stdout)
+            sc = await self.tree.sync(guild=discord.Object(id=guild_id))
+            print(f"Synced {len(sc)} commands to guild", file=sys.stdout)
         except Exception as e:
             print(f"Error syncing commands: {e}", file=sys.stderr)
 
@@ -166,7 +165,7 @@ class ElderGod(commands.Bot):
                 async with self.mdb_con.acquire() as conn:
                     async with conn.cursor(aiomysql.DictCursor) as cursor:
                         await cursor.execute(
-                            'SELECT devour_bonus, swim_active, leader_curse_until, oppression_malus, oppression_until, shield_until FROM egb_character_bonuses WHERE discord_id = %s',
+                            'SELECT devour_bonus, swim_active, leader_curse_until, oppression_malus, oppression_until FROM egb_character_bonuses WHERE discord_id = %s',
                             (interaction.user.id,)
                         )
                         bonuses = await cursor.fetchone()
@@ -218,6 +217,7 @@ class ElderGod(commands.Bot):
                 )
 
                 await self.character_repo.save_character(character)
+                self._discord_characters[character.get_discord_id()] = character
 
                 # Clear bonuses after use
                 async with self.mdb_con.acquire() as conn:
@@ -601,6 +601,7 @@ class ElderGod(commands.Bot):
         old_level = partner_char.get_level()
         partner_char._level_up()
         await self.character_repo.save_character(partner_char)
+        self._discord_characters[partner_char.get_discord_id()] = partner_char
         new_level = partner_char.get_level()
 
         # Handle clan change for partner
@@ -736,6 +737,26 @@ class ElderGod(commands.Bot):
             print(f"Cannot send DM to {user.name}", file=sys.stderr)
         except Exception as e:
             print(f"Error sending admin DM: {e}", file=sys.stderr)
+
+    async def _check_and_consume_shield(self, target_id: int) -> bool:
+        """Check if target has an active shield and consume it. Returns True if blocked."""
+        async with self.mdb_con.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(
+                    'SELECT shield_until FROM egb_character_bonuses WHERE discord_id = %s',
+                    (target_id,)
+                )
+                row = await cursor.fetchone()
+        if row and row.get('shield_until') and row['shield_until'] > datetime.now():
+            async with self.mdb_con.acquire() as conn:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(
+                        'UPDATE egb_character_bonuses SET shield_until = NULL WHERE discord_id = %s',
+                        (target_id,)
+                    )
+                    await conn.commit()
+            return True
+        return False
 
     async def _send_public(self, interaction: discord.Interaction, embed: discord.Embed):
         """

@@ -7,8 +7,8 @@ class AbilityManager:
     """
     Manages ability cooldowns and usage tracking
     """
-    def __init__(self, pg_pool: aiomysql.Pool):
-        self.pg_pool = pg_pool
+    def __init__(self, mdb_pool: aiomysql.Pool):
+        self.mdb_pool = mdb_pool
 
     async def can_use_ability(self, discord_id: int, ability_name: str, cooldown_days: int = 7, short_version: bool = False) -> tuple[bool, Optional[str]]:
         """
@@ -16,7 +16,7 @@ class AbilityManager:
         Returns: (can_use: bool, message: Optional[str])
         """
         try:
-            async with self.pg_pool.acquire() as conn:
+            async with self.mdb_pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cursor:
                     if discord_id == -1:
                         await cursor.execute(
@@ -76,7 +76,7 @@ class AbilityManager:
         Mark an ability as used (update last_used timestamp)
         """
         try:
-            async with self.pg_pool.acquire() as conn:
+            async with self.mdb_pool.acquire() as conn:
                 async with conn.cursor() as cursor:
                     await cursor.execute(
                         '''INSERT INTO egb_ability_usage (discord_id, ability_name, last_used)
@@ -89,20 +89,3 @@ class AbilityManager:
             print(f"Error marking ability as used: {e}", file=sys.stderr)
             return False
 
-    async def get_ability_cooldown_info(self, discord_id: int, ability_name: str) -> Optional[datetime]:
-        """
-        Get last used timestamp for an ability
-        """
-        try:
-            async with self.pg_pool.acquire() as conn:
-                async with conn.cursor(aiomysql.DictCursor) as cursor:
-                    await cursor.execute(
-                        'SELECT last_used FROM egb_ability_usage WHERE discord_id = %s AND ability_name = %s',
-                        (discord_id, ability_name)
-                    )
-                    result = await cursor.fetchone()
-
-            return result['last_used'] if result else None
-        except Exception as e:
-            print(f"Error getting ability cooldown info: {e}", file=sys.stderr)
-            return None

@@ -8,8 +8,8 @@ class CharacterRepository:
     Repository pattern for Character database operations
     Handles all SQL queries related to characters
     """
-    def __init__(self, pg_pool: aiomysql.Pool):
-        self.pg_pool = pg_pool
+    def __init__(self, mdb_pool: aiomysql.Pool):
+        self.mdb_pool = mdb_pool
 
     async def get_character(self, discord_id: int) -> Optional[Character]:
         """
@@ -17,7 +17,7 @@ class CharacterRepository:
         Returns None if character doesn't exist
         """
         try:
-            async with self.pg_pool.acquire() as conn:
+            async with self.mdb_pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cursor:
                     await cursor.execute(
                         '''SELECT discord_id, level, last_attempt, last_successful_levelup
@@ -44,7 +44,7 @@ class CharacterRepository:
         Create a new character in the database
         """
         try:
-            async with self.pg_pool.acquire() as conn:
+            async with self.mdb_pool.acquire() as conn:
                 async with conn.cursor() as cursor:
                     await cursor.execute(
                         '''INSERT INTO egb_characters (discord_id, level, last_attempt, last_successful_levelup)
@@ -62,7 +62,7 @@ class CharacterRepository:
         Uses INSERT ... ON DUPLICATE KEY UPDATE for upsert
         """
         try:
-            async with self.pg_pool.acquire() as conn:
+            async with self.mdb_pool.acquire() as conn:
                 async with conn.cursor() as cursor:
                     await cursor.execute(
                         '''INSERT INTO egb_characters (discord_id, level, last_attempt, last_successful_levelup)
@@ -89,7 +89,7 @@ class CharacterRepository:
         Get top characters by level for leaderboard
         """
         try:
-            async with self.pg_pool.acquire() as conn:
+            async with self.mdb_pool.acquire() as conn:
                 async with conn.cursor(aiomysql.DictCursor) as cursor:
                     await cursor.execute(
                         '''SELECT discord_id, level, last_attempt, last_successful_levelup
@@ -113,19 +113,3 @@ class CharacterRepository:
             print(f"Error getting top characters: {e}", file=sys.stderr)
             return []
 
-    async def character_exists(self, discord_id: int) -> bool:
-        """
-        Check if character exists in database
-        """
-        try:
-            async with self.pg_pool.acquire() as conn:
-                async with conn.cursor() as cursor:
-                    await cursor.execute(
-                        'SELECT COUNT(1) FROM egb_characters WHERE discord_id = %s',
-                        (discord_id,)
-                    )
-                    result = await cursor.fetchone()
-                    return result[0] > 0
-        except Exception as e:
-            print(f"Error checking character existence {discord_id}: {e}", file=sys.stderr)
-            return False

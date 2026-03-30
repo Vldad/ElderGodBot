@@ -1,3 +1,4 @@
+import os
 import discord
 import aiomysql
 from discord import app_commands
@@ -16,27 +17,6 @@ class AbilityCommands:
     def register_commands(bot):
         """Register all ability commands to the bot"""
         
-        # ===== SHIELD HELPER =====
-        async def _check_and_consume_shield(target_id: int) -> bool:
-            """Check if target has an active shield and consume it. Returns True if blocked."""
-            async with bot.mdb_con.acquire() as conn:
-                async with conn.cursor(aiomysql.DictCursor) as cursor:
-                    await cursor.execute(
-                        'SELECT shield_until FROM egb_character_bonuses WHERE discord_id = %s',
-                        (target_id,)
-                    )
-                    row = await cursor.fetchone()
-            if row and row.get('shield_until') and row['shield_until'] > datetime.now():
-                async with bot.mdb_con.acquire() as conn:
-                    async with conn.cursor() as cursor:
-                        await cursor.execute(
-                            'UPDATE egb_character_bonuses SET shield_until = NULL WHERE discord_id = %s',
-                            (target_id,)
-                        )
-                        await conn.commit()
-                return True
-            return False
-
         # ===== CHAUSSETTE (Level 5+) =====
         @bot.tree.command(name="chaussette", description="Crier CHAUSSETTE pour un level gratuit par semaine")
         async def chaussette(interaction: discord.Interaction):
@@ -69,6 +49,7 @@ class AbilityCommands:
                 # Level up !
                 character._level_up()
                 await bot.character_repo.save_character(character)
+                bot._discord_characters[character.get_discord_id()] = character
 
                 # Clear bonuses after use
                 async with bot.mdb_con.acquire() as conn:
@@ -337,7 +318,7 @@ class AbilityCommands:
                     return
                 
                 # Check target's shield
-                if await _check_and_consume_shield(target.id):
+                if await bot._check_and_consume_shield(target.id):
                     await interaction.response.send_message(
                         embed=discord.Embed(
                             title="🛡️ Bouclier !",
@@ -371,7 +352,7 @@ class AbilityCommands:
 
                 target_partner_id = await bot.pact_manager.get_active_pact_partner(target.id)
                 if target_partner_id:
-                    partner_blocked = await _check_and_consume_shield(target_partner_id)
+                    partner_blocked = await bot._check_and_consume_shield(target_partner_id)
                     if not partner_blocked:
                         async with bot.mdb_con.acquire() as conn:
                             async with conn.cursor() as cursor:
@@ -443,7 +424,6 @@ class AbilityCommands:
                     )
                     return
                 
-                import os
                 wings_role_name = os.getenv('ROLE_WINGS', 'Ailes')
                 wings_role = discord.utils.get(interaction.guild.roles, name=wings_role_name)
                 
@@ -526,7 +506,6 @@ class AbilityCommands:
                         last_attempt_str = last_attempt.strftime("%d/%m %H:%M") if last_attempt else "Jamais"
                         
                         # Calculate their current success chance
-                        import os
                         base = int(os.getenv('BASE_LEVELUP_CHANCE', '20'))
                         bonus = int(os.getenv('BONUS_PER_HOUR', '5'))
                         max_c = int(os.getenv('MAX_LEVELUP_CHANCE', '80'))
@@ -613,7 +592,7 @@ class AbilityCommands:
                                 return
                 
                 # Check leader's shield
-                if await _check_and_consume_shield(leader_id):
+                if await bot._check_and_consume_shield(leader_id):
                     try:
                         leader_user = await bot.fetch_user(leader_id)
                         await leader_user.send(embed=discord.Embed(
@@ -661,7 +640,7 @@ class AbilityCommands:
                 # Mirror entomb to leader's pact partner if any
                 leader_partner_id = await bot.pact_manager.get_active_pact_partner(leader_id)
                 if leader_partner_id:
-                    partner_blocked = await _check_and_consume_shield(leader_partner_id)
+                    partner_blocked = await bot._check_and_consume_shield(leader_partner_id)
                     if not partner_blocked:
                         async with bot.mdb_con.acquire() as conn:
                             async with conn.cursor() as cursor:
@@ -967,7 +946,7 @@ class AbilityCommands:
                 amount = random.randint(5, 10)
 
                 # Check target's shield — blocks the entire steal
-                if await _check_and_consume_shield(target.id):
+                if await bot._check_and_consume_shield(target.id):
                     await interaction.response.send_message(
                         embed=discord.Embed(
                             title="🛡️ Bouclier !",
@@ -1026,7 +1005,7 @@ class AbilityCommands:
                 # Mirror steal_malus to victim's pact partner
                 victim_partner_id = await bot.pact_manager.get_active_pact_partner(target.id)
                 if victim_partner_id:
-                    partner_blocked = await _check_and_consume_shield(victim_partner_id)
+                    partner_blocked = await bot._check_and_consume_shield(victim_partner_id)
                     if not partner_blocked:
                         async with bot.mdb_con.acquire() as conn:
                             async with conn.cursor() as cursor:
