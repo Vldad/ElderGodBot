@@ -166,7 +166,7 @@ class ElderGod(commands.Bot):
                 async with self.mdb_con.acquire() as conn:
                     async with conn.cursor(aiomysql.DictCursor) as cursor:
                         await cursor.execute(
-                            'SELECT devour_bonus, swim_active, leader_curse_until, oppression_malus, oppression_until FROM egb_character_bonuses WHERE discord_id = %s',
+                            'SELECT devour_bonus, swim_active, leader_curse_until, oppression_malus, oppression_until, shield_until FROM egb_character_bonuses WHERE discord_id = %s',
                             (interaction.user.id,)
                         )
                         bonuses = await cursor.fetchone()
@@ -373,7 +373,7 @@ class ElderGod(commands.Bot):
                 async with self.mdb_con.acquire() as conn:
                     async with conn.cursor(aiomysql.DictCursor) as cursor:
                         await cursor.execute(
-                            'SELECT devour_bonus, swim_active, leader_curse_until, oppression_malus, oppression_until FROM egb_character_bonuses WHERE discord_id = %s',
+                            'SELECT devour_bonus, swim_active, leader_curse_until, oppression_malus, oppression_until, shield_until FROM egb_character_bonuses WHERE discord_id = %s',
                             (interaction.user.id,)
                         )
                         bonuses = await cursor.fetchone()
@@ -402,6 +402,9 @@ class ElderGod(commands.Bot):
                 has_bonusmalus = False
 
                 if bonuses:
+                    if bonuses.get('shield_until') and bonuses['shield_until'] > datetime.now():
+                        bonus_details.append(f"🛡️ Bouclier actif jusqu'au {bonuses['shield_until'].strftime('%d/%m/%Y à %H:%M')}")
+                        has_bonusmalus = True
                     if bonuses.get('swim_active'):
                         bonus_details.append("🌊 Nage active (cooldown contourné)")
                         has_bonusmalus = True
