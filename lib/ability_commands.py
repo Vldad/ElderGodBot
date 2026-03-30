@@ -1302,6 +1302,243 @@ class AbilityCommands:
                 print(f"Error in shield command: {e}", file=sys.stderr)
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
 
+        # ===== RULES (Accessible à tous) =====
+        RULES_PAGES = [
+            discord.Embed(
+                title="📜 Règles & Commandes — EldergodBot",
+                description=(
+                    "Bienvenue dans le système RPG Legacy of Kain !\n\n"
+                    "**Prérequis :** Tu dois posséder le rôle **Joueur** pour participer.\n\n"
+                    "**Progression**\n"
+                    "• Utilise `/levelup` pour tenter de monter de niveau.\n"
+                    "• Chaque tentative a une chance de base de **20%**, qui augmente de **+5%** par heure d'attente (max **80%**).\n"
+                    "• Tu ne peux tenter qu'**une fois par heure**, et réussir qu'**une fois par jour**.\n"
+                    "• En montant de niveau tu changes de clan et débloques de nouvelles capacités.\n\n"
+                    "**Clans & niveaux**\n"
+                    "```\n"
+                    "Niv 1–4   → Fledgling  (Humain)\n"
+                    "Niv 5–9   → Melchahim  (Mangeur de Peau)\n"
+                    "Niv 10–14 → Zephonim   (Grimpeur)\n"
+                    "Niv 15–19 → Dumahim    (Croisé)\n"
+                    "Niv 20–24 → Rahabim    (Noyé)\n"
+                    "Niv 25–29 → Turelim    (Loyal)\n"
+                    "Niv 30–39 → Razielim   (Banni) 🪶\n"
+                    "Niv 40+   → Elder      (Ancien)\n"
+                    "```"
+                ),
+                color=discord.Color.dark_red()
+            ),
+            discord.Embed(
+                title="🧛 Niveau 1 — Fledgling (Humain)",
+                color=discord.Color.dark_grey()
+            ),
+            discord.Embed(
+                title="🩸 Niveau 5 — Melchahim (Mangeur de Peau)",
+                color=discord.Color(0x8B4513)
+            ),
+            discord.Embed(
+                title="🕷️ Niveau 10 — Zephonim (Grimpeur)",
+                color=discord.Color(0x228B22)
+            ),
+            discord.Embed(
+                title="⚔️ Niveau 15 — Dumahim (Croisé)",
+                color=discord.Color(0xFFD700)
+            ),
+            discord.Embed(
+                title="🌊 Niveau 20 — Rahabim (Noyé)",
+                color=discord.Color(0x4169E1)
+            ),
+            discord.Embed(
+                title="🪶 Niveau 30 — Razielim (Banni)",
+                color=discord.Color(0x9370DB)
+            ),
+            discord.Embed(
+                title="👑 Niveau 40 — Elder (Ancien)",
+                color=discord.Color(0xB8860B)
+            ),
+            discord.Embed(
+                title="🛡️ Niveau 50 — Elder (Ancien) — suite",
+                color=discord.Color(0xB8860B)
+            ),
+        ]
+
+        RULES_PAGES[1].add_field(name="/levelup", inline=False, value=(
+            "Tente de monter de niveau.\n"
+            "• Chance de base : **20%** (+5%/heure d'attente, max 80%)\n"
+            "• Cooldown : **1h** entre chaque tentative\n"
+            "• Limite : **1 succès par jour**\n"
+            "• Les bonus/malus actifs s'appliquent au moment du jet\n"
+            "• En cas de succès, le partenaire de pacte gagne également un niveau"
+        ))
+        RULES_PAGES[1].add_field(name="/stats", inline=False, value=(
+            "Affiche ton profil privé.\n"
+            "• Niveau, clan, rôle\n"
+            "• Cooldowns de toutes tes capacités\n"
+            "• Tous les effets actifs (bless, curse, devour, steal, oppression, bouclier, nage)\n"
+            "• Chance de succès actuelle au prochain `/levelup`"
+        ))
+        RULES_PAGES[1].add_field(name="/profile [@joueur]", inline=False, value=(
+            "Affiche le profil **public** d'un joueur (ou le tien si aucun joueur mentionné).\n"
+            "• Niveau et clan visibles par tous\n"
+            "• Sans les détails privés (effets actifs, cooldowns)"
+        ))
+        RULES_PAGES[1].add_field(name="/bless @joueur", inline=False, value=(
+            "Bénit un joueur pour lui donner un bonus sur son prochain `/levelup`.\n"
+            "• Bonus : **+3 à +8%** (aléatoire, cumulatif)\n"
+            "• Cooldown : **7 jours** par lanceur\n"
+            "• Le joueur ciblé reçoit un DM\n"
+            "• Si la cible a un pacte, son partenaire reçoit le même bonus\n"
+            "• Impossible de se bénir soi-même"
+        ))
+        RULES_PAGES[1].add_field(name="/quote [personnage]", inline=False, value=(
+            "Affiche une citation aléatoire de l'univers Legacy of Kain.\n"
+            "• Autocomplétion sur le nom du personnage\n"
+            "• Paramètre optionnel `lang` : `fr` ou `en`\n"
+            "• Accessible à tous, sans cooldown"
+        ))
+
+        RULES_PAGES[2].add_field(name="/devour", inline=False, value=(
+            "Dévore une âme pour obtenir un bonus sur ton prochain `/levelup`.\n"
+            "• Bonus : **+3 à +8%** (cumulatif)\n"
+            "• Cooldown : **1 jour**\n"
+            "• Si tu as un pacte, ton partenaire reçoit le même bonus automatiquement"
+        ))
+        RULES_PAGES[2].add_field(name="/chaussette", inline=False, value=(
+            "Crie CHAUSSETTE pour obtenir un **level up gratuit garanti**.\n"
+            "• Aucun jet de dés — le niveau est accordé directement\n"
+            "• Cooldown : **7 jours**\n"
+            "• Efface tous tes bonus/malus actifs après utilisation\n"
+            "• Si tu as un pacte, ton partenaire gagne également un niveau"
+        ))
+
+        RULES_PAGES[3].add_field(name="/curse @joueur", inline=False, value=(
+            "Maudit un joueur pour réduire ses chances au prochain `/levelup`.\n"
+            "• Malus : **-5%** (cumulatif)\n"
+            "• Cooldown : **7 jours** par lanceur\n"
+            "• Le joueur ciblé reçoit un DM\n"
+            "• Si la cible a un pacte, son partenaire subit également la malédiction\n"
+            "• Bloqué par le **bouclier** de la cible\n"
+            "• Impossible de se maudire soi-même"
+        ))
+        RULES_PAGES[3].add_field(name="/entomb", inline=False, value=(
+            "Condamne le joueur avec le niveau le plus élevé (le leader).\n"
+            "• Durée : **1 ou 2 jours** (aléatoire) — le leader ne peut pas faire `/levelup`\n"
+            "• Cooldown : **7 jours GLOBAL** (partagé par tout le serveur)\n"
+            "• Le leader et son partenaire de pacte reçoivent un DM\n"
+            "• Si le leader a un pacte, son partenaire est également condamné\n"
+            "• Bloqué par le **bouclier** du leader\n"
+            "• Impossible si une condamnation est déjà active ou si tu es le leader"
+        ))
+
+        RULES_PAGES[4].add_field(name="(aucune nouvelle capacité)", inline=False, value=(
+            "Le clan Dumahim ne débloque pas de nouvelles commandes.\n"
+            "Tu conserves toutes les capacités acquises et continues ta progression vers le clan Rahabim."
+        ))
+
+        RULES_PAGES[5].add_field(name="/swim", inline=False, value=(
+            "Contourne le cooldown quotidien de `/levelup` une fois.\n"
+            "• Permet de tenter un level up même si tu as déjà réussi aujourd'hui\n"
+            "• Ne contourne pas le cooldown d'1 heure entre tentatives\n"
+            "• Cooldown : **7 jours**\n"
+            "• Si tu as un pacte, ton partenaire reçoit également le bonus de nage"
+        ))
+        RULES_PAGES[5].add_field(name="/pact @joueur", inline=False, value=(
+            "Scelle un **Pacte de Sang** avec un autre joueur pendant 24h.\n"
+            "• Le joueur ciblé reçoit une demande en DM avec **1 heure** pour accepter ou refuser\n"
+            "• Effets du pacte :\n"
+            "  — Tous les effets (bless, curse, devour, swim, steal, entomb, shield) sont **mirrorés** au partenaire\n"
+            "  — Chaque `/levelup` réussi donne **un niveau gratuit** au partenaire\n"
+            "• Cooldown : **24h** par joueur\n"
+            "• Un seul pacte actif à la fois — les deux joueurs doivent être niveau 20+\n"
+            "• Impossible de se pacifier soi-même"
+        ))
+
+        RULES_PAGES[6].add_field(name="/evolve", inline=False, value=(
+            "Obtiens le rôle cosmétique **Ailes** de Raziel.\n"
+            "• Rôle décoratif uniquement, aucun effet en jeu\n"
+            "• Utilisable une seule fois — pas de cooldown"
+        ))
+        RULES_PAGES[6].add_field(name="/spectral", inline=False, value=(
+            "Révèle le **Royaume Spectral** : classement des 10 joueurs les plus puissants.\n"
+            "• Affiche : niveau, clan, dernière tentative, chance de succès actuelle\n"
+            "• Informations normalement cachées — pas de cooldown"
+        ))
+
+        RULES_PAGES[7].add_field(name="/steal @joueur", inline=False, value=(
+            "Siphonne une partie de la chance d'un joueur pour te l'approprier.\n"
+            "• Montant : **5 à 10%** (aléatoire)\n"
+            "• La cible perd ce % sur son prochain levelup, tu le gagnes sur le tien\n"
+            "• Cooldown : **24h** par lanceur\n"
+            "• La cible reçoit un DM\n"
+            "• Si tu as un pacte, ton partenaire reçoit également le bonus de vol\n"
+            "• Si la cible a un pacte, son partenaire subit également le malus\n"
+            "• Bloqué par le **bouclier** de la cible\n"
+            "• Impossible de se voler soi-même"
+        ))
+        RULES_PAGES[7].add_field(name="/oppress  ⚠️ Leader uniquement", inline=False, value=(
+            "Inflige un malus massif à **tous les autres joueurs** jusqu'à minuit.\n"
+            "• Malus : **-20 à -50%** (aléatoire, appliqué à tous sauf le leader)\n"
+            "• Cooldown : **7 jours GLOBAL**\n"
+            "• Réservé au joueur avec le niveau le plus élevé\n"
+            "• Non bloqué par le bouclier"
+        ))
+
+        RULES_PAGES[8].add_field(name="/shield", inline=False, value=(
+            "Active un **bouclier mystique** qui absorbe le prochain malus reçu.\n"
+            "• Durée : **24h** (ou jusqu'à absorption d'un malus)\n"
+            "• Protège contre : `/curse`, `/steal` (malus), `/entomb`\n"
+            "• Ne protège **pas** contre `/oppress`\n"
+            "• Cooldown : **7 jours** par lanceur\n"
+            "• Si tu as un pacte, ton partenaire reçoit également un bouclier\n"
+            "• Si le partenaire a déjà un bouclier, sa durée est **rafraîchie**\n"
+            "• Attaquant notifié que l'attaque a été absorbée"
+        ))
+        RULES_PAGES[8].add_field(name="📌 Rappel général", inline=False, value=(
+            "• Toutes les réponses du bot sont **privées** sauf `/profile` et `/entomb`\n"
+            "• Les effets (bless, curse, devour, steal) sont **effacés après chaque `/levelup`**\n"
+            "• `/stats` affiche tous tes effets actifs et leurs sources\n"
+            "• En cas de problème, contacte un administrateur"
+        ))
+
+        for i, page in enumerate(RULES_PAGES):
+            page.set_footer(text=f"Page {i + 1}/{len(RULES_PAGES)}")
+
+        @bot.tree.command(name="rules", description="Afficher les règles et commandes du bot")
+        async def rules(interaction: discord.Interaction):
+            try:
+                view = RulesView(pages=RULES_PAGES, author_id=interaction.user.id)
+                await interaction.response.send_message(embed=RULES_PAGES[0], view=view, ephemeral=True)
+            except Exception as e:
+                print(f"Error in rules command: {e}", file=sys.stderr)
+                await interaction.response.send_message("Une erreur est survenue.", ephemeral=True)
+
+
+class RulesView(discord.ui.View):
+    """Previous/Next pagination buttons for /rules (ephemeral — each user gets their own instance)."""
+
+    def __init__(self, pages: list, author_id: int):
+        super().__init__(timeout=300)
+        self.pages = pages
+        self.author_id = author_id
+        self.current = 0
+        self._update_buttons()
+
+    def _update_buttons(self):
+        self.prev_button.disabled = self.current == 0
+        self.next_button.disabled = self.current == len(self.pages) - 1
+
+    @discord.ui.button(label="◀ Précédent", style=discord.ButtonStyle.secondary)
+    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current -= 1
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
+    @discord.ui.button(label="Suivant ▶", style=discord.ButtonStyle.secondary)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current += 1
+        self._update_buttons()
+        await interaction.response.edit_message(embed=self.pages[self.current], view=self)
+
 
 class PactView(discord.ui.View):
     """Ephemeral accept/decline buttons sent to the public channel."""
