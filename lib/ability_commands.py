@@ -452,10 +452,10 @@ class AbilityCommands:
                     clan_info = bot.get_clan_info_for_user(character.get_level())
                     embed = discord.Embed(
                         title="👼 Évolution Céleste",
-                        description=f"Tes ailes se déploient majestueusement !\n\Tu as obtenu le rôle {wings_role.mention} !",
+                        description=f"Tes ailes se déploient majestueusement !\nTu as obtenu le rôle {wings_role.mention} !",
                         color=clan_info['color']
                     )
-                    embed.set_image(url="https://i.imgur.com/raziel_wings.gif")  # Replace with actual image if desired
+                    embed.set_image(url="https://media.tenor.com/cChWq5iFrh4AAAAd/legacy-of-kain.gif")  
                     
                     await interaction.response.send_message(embed=embed, ephemeral=True)
                     await bot.log(interaction.user.id, datetime.now(), 'evolve (obtained wings)')
