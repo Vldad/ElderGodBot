@@ -1098,17 +1098,17 @@ class AbilityCommands:
                     await bot._send_error_embed(interaction, f"**{target.display_name}** n'a pas le rôle **Joueur**.")
                     return
 
-                # Check requester cooldown (24h)
+                # Check requester cooldown (7 days)
                 can_use, msg = await bot.ability_manager.can_use_ability(
-                    interaction.user.id, 'pact', cooldown_days=1
+                    interaction.user.id, 'pact', cooldown_days=7
                 )
                 if not can_use:
                     await bot._send_cd_msg_embed(interaction, f"Pacte en cooldown. {msg}")
                     return
 
-                # Check target cooldown (24h)
+                # Check target cooldown (7 days)
                 can_target, _ = await bot.ability_manager.can_use_ability(
-                    target.id, 'pact', cooldown_days=1
+                    target.id, 'pact', cooldown_days=7
                 )
                 if not can_target:
                     await bot._send_error_embed(
