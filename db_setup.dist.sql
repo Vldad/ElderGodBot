@@ -99,6 +99,21 @@ CREATE TABLE IF NOT EXISTS egb_pacts (
     INDEX idx_pacts_status_expires (status, expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Table: egb_sacrifice_links
+-- Tracks active sacrifice links: x sacrifices y for 15 minutes.
+-- If x's total probability reaches 0 during the link, y loses 1 level.
+-- One active link per victim (y) at a time.
+CREATE TABLE IF NOT EXISTS egb_sacrifice_links (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    caster_id BIGINT NOT NULL,
+    victim_id BIGINT NOT NULL,
+    expires_at DATETIME NOT NULL,
+    active BOOLEAN DEFAULT TRUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_sacrifice_victim (victim_id, active),
+    INDEX idx_sacrifice_caster (caster_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Table: egb_dim_characters
 CREATE TABLE IF NOT EXISTS egb_dim_characters (
     Id INT AUTO_INCREMENT PRIMARY KEY,

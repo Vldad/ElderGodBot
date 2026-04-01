@@ -93,6 +93,7 @@ COLOR_FLEDGLING / COLOR_MELCHAHIM / ... (hex, ex: #8B0000)
 | /oppress     | Leader only   | 7 jours GLOBAL   | Malus –20 à –50% à tous les autres |
 | /steal       | 40            | 24h/joueur       | Siphonner 5–10% de chance d'un joueur |
 | /shield      | 50            | 7 jours/joueur   | Bouclier 24h absorbant le prochain malus (curse, steal, entomb) — transmis via pacte |
+| /sacrifice   | 60            | 7 jours/joueur   | Lie y pendant 15 min — si la proba totale de x tombe à 0, y perd 1 niveau ; y immunisé 7 jours après leveldown |
 | /quote       | —             | —                | Citation aléatoire LoK (autocomplete) |
 
 ## Patterns importants
@@ -101,6 +102,7 @@ COLOR_FLEDGLING / COLOR_MELCHAHIM / ... (hex, ex: #8B0000)
 - Pacte actif : vérifié via `PactManager.get_active_pact_partner()` — les effets (bless, curse, steal, devour, swim, entomb, shield) sont mirrorés au partenaire au moment de leur création ; un level up réussi donne un niveau gratuit au partenaire via `_apply_pact_level()` ; chaque mirroring envoie un DM au partenaire
 - Bouclier (`shield_until`) : absorbe le prochain malus (curse, steal_malus, entomb) — pact mirror vérifie aussi le bouclier du partenaire ; si bouclier actif sur un pact mirror de /shield, la durée est rafraîchie
 - `egb_character_bonuses` est lu à chaque `/levelup` pour appliquer tous les bonus/malus actifs
+- Sacrifice (`egb_sacrifice_links`) : lien de 15 min entre x (caster) et y (victim) — après chaque `/curse` ou `/steal` sur x, `_check_sacrifice_trigger()` calcule la probabilité totale de x via `_compute_current_probability()` ; si elle atteint 0, y perd 1 niveau, le lien est détruit, et y reçoit 7 jours d'immunité (`sacrifice_victim` dans `egb_ability_usage`) ; bloqué par le bouclier de y au moment du `/sacrifice`
 - Toutes les réponses bot sont `ephemeral=True`
 - Logging systématique dans `egb_log` après chaque commande
 

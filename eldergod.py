@@ -491,7 +491,7 @@ class ElderGod(commands.Bot):
                     status_text += "\n\n**Effets actifs:**\n" + "\n".join(bonus_details)
 
                 if has_bonusmalus:
-                    status_text += f"\n**Chance totale: {max(min((success_chance + total_bonus), 100.0), 0.0):.1f}%**"
+                    status_text += f"\n**Chance totale: {min((success_chance + total_bonus), 100.0):.1f}%**"
 
                 # Show bonus/maledictions
                 embed.add_field(
@@ -774,19 +774,28 @@ class ElderGod(commands.Bot):
             return True
         return False
 
+    async def _post_to_commands_channel(self, guild: discord.Guild, embed: discord.Embed) -> bool:
+        """
+        Post an embed directly to COMMANDS_CHANNEL_ID if configured.
+        Returns True if posted, False if channel not configured or not found.
+        """
+        commands_channel_id = os.getenv('COMMANDS_CHANNEL_ID', '').strip()
+        if commands_channel_id:
+            channel = guild.get_channel(int(commands_channel_id))
+            if channel:
+                await channel.send(embed=embed)
+                return True
+        return False
+
     async def _send_public(self, interaction: discord.Interaction, embed: discord.Embed):
         """
         Send a public embed. If COMMANDS_CHANNEL_ID is set, posts to that channel
         and acknowledges the interaction ephemerally. Otherwise sends publicly in place.
         """
-        commands_channel_id = os.getenv('COMMANDS_CHANNEL_ID', '').strip()
-        if commands_channel_id:
-            channel = interaction.guild.get_channel(int(commands_channel_id))
-            if channel:
-                await channel.send(embed=embed)
-                await interaction.response.send_message("✅", ephemeral=True, delete_after=1)
-                return
-        await interaction.response.send_message(embed=embed, ephemeral=False)
+        if await self._post_to_commands_channel(interaction.guild, embed):
+            await interaction.response.send_message("✅", ephemeral=True, delete_after=1)
+        else:
+            await interaction.response.send_message(embed=embed, ephemeral=False)
 
     async def _has_player_role(self, member: discord.Member) -> bool:
         """Check if user has the 'Joueur' role"""
@@ -927,6 +936,169 @@ class ElderGod(commands.Bot):
     def get_clan_info_for_user(self, level: int) -> dict:
         """Get clan information for a given level"""
         return ClanSystem.get_clan_by_level(level)
+
+    async def _check_sacrifice_trigger(self, caster_id: int, guild: discord.Guild):
+        """
+        Called after a malus lands on caster_id.
+        If caster_id has an active sacrifice link and their probability has reached 0,
+        the victim loses 1 level and the link is destroyed.
+        """
+        try:
+            # Check for active sacrifice link where this player is the caster
+            async with self.mdb_con.acquire() as conn:
+                async with conn.cursor(aiomysql.DictCursor) as cursor:
+                    await cursor.execute(
+                        '''SELECT id, victim_id FROM egb_sacrifice_links
+                           WHERE caster_id = %s AND active = TRUE AND expires_at > NOW()''',
+                        (caster_id,)
+                    )
+                    link = await cursor.fetchone()
+
+            if not link:
+                return
+
+            probability = await self._compute_current_probability(caster_id)
+            if probability > 0:
+                return
+
+            # Probability hit 0 — trigger leveldown on victim
+            victim_id = link['victim_id']
+            link_id = link['id']
+
+            # Deactivate the link
+            async with self.mdb_con.acquire() as conn:
+                async with conn.cursor() as cursor:
+                    await cursor.execute(
+                        'UPDATE egb_sacrifice_links SET active = FALSE WHERE id = %s',
+                        (link_id,)
+                    )
+                    await conn.commit()
+
+            # Apply 7-day immunity on victim
+            await self.ability_manager.use_ability(victim_id, 'sacrifice_victim')
+
+            # Level down the victim
+            victim_char = await self.get_or_create_character(victim_id)
+            old_level = victim_char.get_level()
+            if old_level <= 1:
+                # Can't go below 1 — still counts as triggered
+                pass
+            else:
+                victim_char._level_down()
+                await self.character_repo.save_character(victim_char)
+                self._discord_characters[victim_char.get_discord_id()] = victim_char
+                new_level = victim_char.get_level()
+
+                # Handle clan role downgrade if needed
+                if ClanSystem.has_clan_changed(old_level, new_level):
+                    new_clan = ClanSystem.get_clan_by_level(new_level)
+                    role_assigned = await self._assign_clan_role(guild.get_member(victim_id), new_clan)
+                    if not role_assigned:
+                        await self._send_admin_dm(guild.get_member(victim_id), new_clan)
+
+            # Notify caster via DM
+            caster_user = guild.get_member(caster_id)
+            if caster_user:
+                try:
+                    victim_user = guild.get_member(victim_id)
+                    victim_name = victim_user.display_name if victim_user else f"#{victim_id}"
+                    await caster_user.send(embed=discord.Embed(
+                        title="💀 Sacrifice Accompli !",
+                        description=(
+                            f"Ta probabilité a atteint **0%** ! Le sacrifice s'est accompli.\n"
+                            f"**{victim_name}** est passé au niveau **{victim_char.get_level()}** !"
+                        ),
+                        color=discord.Color.dark_red()
+                    ))
+                except Exception:
+                    pass
+
+            # Notify victim via DM
+            victim_user = guild.get_member(victim_id)
+            if victim_user:
+                try:
+                    caster_name = caster_user.display_name if caster_user else f"#{caster_id}"
+                    await victim_user.send(embed=discord.Embed(
+                        title="💀 Sacrifice Accompli !",
+                        description=(
+                            f"La probabilité de **{caster_name}** a atteint **0%** !\n"
+                            f"Tu es passé au niveau **{victim_char.get_level()}** (–1 niveau).\n"
+                            f"Tu es immunisé contre le sacrifice pendant **7 jours**."
+                        ),
+                        color=discord.Color.dark_red()
+                    ))
+                except Exception:
+                    pass
+
+            # Public announcement in COMMANDS_CHANNEL_ID
+            caster_user = guild.get_member(caster_id)
+            victim_user = guild.get_member(victim_id)
+            caster_mention = caster_user.mention if caster_user else f"#{caster_id}"
+            victim_mention = victim_user.mention if victim_user else f"#{victim_id}"
+            try:
+                await self._post_to_commands_channel(guild, discord.Embed(
+                    title="💀 Sacrifice Accompli !",
+                    description=(
+                        f"Le sacrifice de {caster_mention} s'est accompli !\n"
+                        f"{victim_mention} perd **1 niveau** et tombe au niveau **{victim_char.get_level()}**."
+                    ),
+                    color=discord.Color.dark_red()
+                ))
+            except Exception:
+                pass
+
+            await self.log(victim_id, datetime.now(), f'sacrifice leveldown by {caster_id} (now level {victim_char.get_level()})')
+
+        except Exception as e:
+            print(f"Error in _check_sacrifice_trigger: {e}", file=sys.stderr)
+
+    async def _compute_current_probability(self, discord_id: int) -> float:
+        """
+        Compute the full current levelup probability for a player,
+        including all active bonuses/maluses (same logic as /levelup).
+        """
+        base_chance = int(os.getenv('BASE_LEVELUP_CHANCE', '20'))
+        bonus_per_hour = int(os.getenv('BONUS_PER_HOUR', '5'))
+        max_chance = int(os.getenv('MAX_LEVELUP_CHANCE', '80'))
+
+        character = await self.get_or_create_character(discord_id)
+        probability = character.calculate_success_chance(base_chance, bonus_per_hour, max_chance)
+
+        async with self.mdb_con.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(
+                    'SELECT devour_bonus, oppression_malus, oppression_until FROM egb_character_bonuses WHERE discord_id = %s',
+                    (discord_id,)
+                )
+                bonuses = await cursor.fetchone()
+
+        async with self.mdb_con.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cursor:
+                await cursor.execute(
+                    '''SELECT effect_type, SUM(amount) as total
+                       FROM egb_character_effects
+                       WHERE discord_id = %s
+                       GROUP BY effect_type''',
+                    (discord_id,)
+                )
+                effects_rows = await cursor.fetchall()
+
+        effects = {row['effect_type']: int(row['total']) for row in (effects_rows or [])}
+        total_bonus = 0
+
+        if bonuses:
+            if bonuses.get('devour_bonus'):
+                total_bonus += bonuses['devour_bonus']
+            if bonuses.get('oppression_malus') and bonuses.get('oppression_until'):
+                if bonuses['oppression_until'] > datetime.now():
+                    total_bonus += bonuses['oppression_malus']
+
+        total_bonus += effects.get('bless', 0)
+        total_bonus -= effects.get('curse', 0)
+        total_bonus += effects.get('steal_bonus', 0)
+        total_bonus -= effects.get('steal_malus', 0)
+
+        return max(min(probability + total_bonus, 100.0), 0.0)
 
     def has_clan_changed(self, old_level: int, new_level: int) -> bool:
         """Check if clan changed between levels"""

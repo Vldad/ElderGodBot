@@ -375,6 +375,8 @@ class AbilityCommands:
                             ))
                         except Exception:
                             pass
+                        # Pact mirror curse may also trigger sacrifice on the partner
+                        await bot._check_sacrifice_trigger(target_partner_id, interaction.guild)
                     else:
                         try:
                             partner_user = await bot.fetch_user(target_partner_id)
@@ -406,11 +408,14 @@ class AbilityCommands:
                 
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 await bot.log(interaction.user.id, datetime.now(), f'curse on {target.id}')
-                
+
+                # Check if curse on target triggers a sacrifice (target is x in a sacrifice link)
+                await bot._check_sacrifice_trigger(target.id, interaction.guild)
+
             except Exception as e:
                 print(f"Error in curse command: {e}")
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
-                      
+
         # ===== EVOLVE (Level 30+) =====
         @app_commands.guild_only()
         @bot.tree.command(name="evolve", description="Obtenir les ailes de Raziel (rôle cosmétique)")
@@ -1036,6 +1041,8 @@ class AbilityCommands:
                             ))
                         except Exception:
                             pass
+                        # Pact mirror steal_malus may also trigger sacrifice on the partner
+                        await bot._check_sacrifice_trigger(victim_partner_id, interaction.guild)
                     else:
                         try:
                             partner_user = await bot.fetch_user(victim_partner_id)
@@ -1067,8 +1074,140 @@ class AbilityCommands:
                 await interaction.response.send_message(embed=embed, ephemeral=True)
                 await bot.log(interaction.user.id, datetime.now(), f'steal {amount}% from {target.id}')
 
+                # Check if steal_malus on target triggers a sacrifice (target is x in a sacrifice link)
+                await bot._check_sacrifice_trigger(target.id, interaction.guild)
+
             except Exception as e:
                 print(f"Error in steal command: {e}", file=sys.stderr)
+                await bot._send_error_embed(interaction, "Une erreur est survenue.")
+
+        # ===== SACRIFICE (Level 60+) =====
+        @app_commands.guild_only()
+        @bot.tree.command(name="sacrifice", description="Sacrifier un joueur : si ta probabilité tombe à 0 en 15 min, il perd un niveau")
+        @app_commands.describe(target="Le joueur que tu veux sacrifier")
+        async def sacrifice(interaction: discord.Interaction, target: discord.Member):
+            if not await bot._has_player_role(interaction.user):
+                await bot._send_error_embed(interaction, "Tu dois avoir le rôle **Joueur**.")
+                return
+
+            try:
+                character = await bot.get_or_create_character(interaction.user.id)
+
+                if character.get_level() < 60:
+                    await bot._send_error_embed(
+                        interaction,
+                        "Tu dois être niveau 60 minimum pour utiliser cette capacité."
+                    )
+                    return
+
+                if target.id == interaction.user.id:
+                    await bot._send_error_embed(interaction, "Tu ne peux pas te sacrifier toi-même !")
+                    return
+
+                if not await bot._has_player_role(target):
+                    await bot._send_error_embed(interaction, f"**{target.display_name}** n'a pas le rôle **Joueur**.")
+                    return
+
+                # Check caster cooldown (7 days)
+                can_use, msg = await bot.ability_manager.can_use_ability(
+                    interaction.user.id, 'sacrifice', cooldown_days=7
+                )
+                if not can_use:
+                    await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {msg}")
+                    return
+
+                # Check victim immunity (7 days after having lost a level via sacrifice)
+                victim_immune, immune_msg = await bot.ability_manager.can_use_ability(
+                    target.id, 'sacrifice_victim', cooldown_days=7
+                )
+                if not victim_immune:
+                    await bot._send_error_embed(
+                        interaction,
+                        f"**{target.display_name}** est immunisé contre le sacrifice. {immune_msg}"
+                    )
+                    return
+
+                # Check target's shield
+                if await bot._check_and_consume_shield(target.id):
+                    await interaction.response.send_message(
+                        embed=discord.Embed(
+                            title="🛡️ Bouclier !",
+                            description=f"**{target.display_name}** est protégé par un bouclier mystique ! Le sacrifice est absorbé.",
+                            color=discord.Color.blue()
+                        ),
+                        ephemeral=True
+                    )
+                    try:
+                        await target.send(embed=discord.Embed(
+                            title="🛡️ Bouclier Activé !",
+                            description=f"Ton bouclier a absorbé le sacrifice de **{interaction.user.display_name}** !",
+                            color=discord.Color.blue()
+                        ))
+                    except Exception:
+                        pass
+                    return
+
+                # Check victim has no active sacrifice link already
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor(aiomysql.DictCursor) as cursor:
+                        await cursor.execute(
+                            '''SELECT id FROM egb_sacrifice_links
+                               WHERE victim_id = %s AND active = TRUE AND expires_at > NOW()''',
+                            (target.id,)
+                        )
+                        existing = await cursor.fetchone()
+
+                if existing:
+                    await bot._send_error_embed(
+                        interaction,
+                        f"**{target.display_name}** est déjà la cible d'un sacrifice actif !"
+                    )
+                    return
+
+                # Create the sacrifice link (15 minutes)
+                expires_at = datetime.now() + timedelta(minutes=15)
+                async with bot.mdb_con.acquire() as conn:
+                    async with conn.cursor() as cursor:
+                        await cursor.execute(
+                            '''INSERT INTO egb_sacrifice_links (caster_id, victim_id, expires_at, active)
+                               VALUES (%s, %s, %s, TRUE)''',
+                            (interaction.user.id, target.id, expires_at)
+                        )
+                        await conn.commit()
+
+                await bot.ability_manager.use_ability(interaction.user.id, 'sacrifice')
+
+                # Notify victim via DM
+                try:
+                    await target.send(embed=discord.Embed(
+                        title="💀 Sacrifice !",
+                        description=(
+                            f"**{interaction.user.display_name}** t'a lié par un **Sacrifice** !\n\n"
+                            f"Si sa probabilité de levelup tombe à **0%** dans les 15 prochaines minutes, "
+                            f"tu perdras **1 niveau**.\n"
+                            f"Le lien expire à **{expires_at.strftime('%H:%M:%S')}**."
+                        ),
+                        color=discord.Color.dark_red()
+                    ))
+                except Exception:
+                    pass
+
+                clan_info = bot.get_clan_info_for_user(character.get_level())
+                embed = discord.Embed(
+                    title="💀 Sacrifice Lancé !",
+                    description=(
+                        f"Tu as lié **{target.display_name}** par un Sacrifice !\n\n"
+                        f"Si ta probabilité de levelup tombe à **0%** avant **{expires_at.strftime('%H:%M:%S')}**, "
+                        f"**{target.display_name}** perdra **1 niveau**.\n\n"
+                        f"Invite d'autres joueurs à te lancer des `/curse` et `/steal` !"
+                    ),
+                    color=clan_info['color']
+                )
+                await interaction.response.send_message(embed=embed, ephemeral=True)
+                await bot.log(interaction.user.id, datetime.now(), f'sacrifice on {target.id}')
+
+            except Exception as e:
+                print(f"Error in sacrifice command: {e}", file=sys.stderr)
                 await bot._send_error_embed(interaction, "Une erreur est survenue.")
 
         # ===== PACT (Level 20+) =====
@@ -1374,6 +1513,10 @@ class AbilityCommands:
                 title="🛡️ Niveau 50 — Elder (Ancien) — suite",
                 color=discord.Color(0xB8860B)
             ),
+            discord.Embed(
+                title="💀 Niveau 60 — Elder (Ancien) — suite",
+                color=discord.Color(0xB8860B)
+            ),
         ]
 
         RULES_PAGES[1].add_field(name="🎲 /levelup", inline=False, value=(
@@ -1512,6 +1655,21 @@ class AbilityCommands:
             "• Les effets (bless, curse, devour, steal) sont **effacés après chaque `/levelup`**\n"
             "• `/stats` affiche tous tes effets actifs et leurs sources\n"
             "• En cas de problème, contacte <@340193200608116746>"
+        ))
+
+        RULES_PAGES[9].add_field(name="💀 /sacrifice @joueur", inline=False, value=(
+            "Lie un joueur (y) à toi par un **Sacrifice** pendant **15 minutes**.\n"
+            "• Aucune confirmation — le lien est immédiat\n"
+            "• Pendant le lien, ta **probabilité totale de levelup** est surveillée en temps réel\n"
+            "• Si elle atteint **0%** avant l'expiration, **y perd 1 niveau**\n"
+            "• Le lien est détruit dès qu'il se déclenche\n"
+            "• Ta probabilité inclut **tous les effets actifs** (bless, curse, steal, devour, oppression...)\n"
+            "• Stratégie : activer après un levelup réussi (probabilité à 20%), puis laisser d'autres joueurs t'envoyer des `/curse` et `/steal`\n"
+            "• Cooldown : **7 jours** par lanceur\n"
+            "• Bloqué par le **bouclier** de la cible\n"
+            "• Une fois déclenché, y est **immunisé 7 jours** contre le sacrifice\n"
+            "• Si le lien expire sans déclencher, y peut être ciblé immédiatement\n"
+            "• Impossible de se sacrifier soi-même"
         ))
 
         for i, page in enumerate(RULES_PAGES):

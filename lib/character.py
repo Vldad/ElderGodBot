@@ -104,6 +104,11 @@ class Character:
         """Internal method to increase level"""
         self._level += 1
         self._lastSuccessfulLevelup = date.today()
+
+    def _level_down(self):
+        """Internal method to decrease level (minimum 1)"""
+        if self._level > 1:
+            self._level -= 1
     
     def to_dict(self) -> dict:
         """Convert character to dictionary for serialization"""

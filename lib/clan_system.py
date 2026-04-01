@@ -128,7 +128,8 @@ class ClanSystem:
                 {'level': 30, 'command': '/spectral', 'description': 'Voir le royaume spectral', 'cooldown_days': 0, 'is_cooldown_global': False},
                 {'level': 40, 'command': '/steal', 'description': 'Siphonner 5-10% de chance d\'un joueur', 'cooldown_days': 1, 'is_cooldown_global': False},
                 {'level': 40, 'command': '/oppress', 'description': '[Leader only] Infliger un malus à tous les joueurs jusqu\'à minuit', 'cooldown_days': 7, 'is_cooldown_global': True},
-                {'level': 50, 'command': '/shield', 'description': 'Activer un bouclier qui absorbe le prochain malus (24h)', 'cooldown_days': 7, 'is_cooldown_global': False}
+                {'level': 50, 'command': '/shield', 'description': 'Activer un bouclier qui absorbe le prochain malus (24h)', 'cooldown_days': 7, 'is_cooldown_global': False},
+                {'level': 60, 'command': '/sacrifice', 'description': 'Lier un joueur : si ta probabilité tombe à 0 en 15 min, il perd un niveau', 'cooldown_days': 7, 'is_cooldown_global': False}
             ]
         }
     }
