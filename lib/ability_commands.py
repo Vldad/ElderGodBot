@@ -321,6 +321,8 @@ class AbilityCommands:
                     await bot._send_cd_msg_embed(interaction, f"Capacité en cooldown. {cooldown_msg}")
                     return
                 
+                await bot.ability_manager.use_ability(interaction.user.id, 'curse')
+
                 # Check target's shield
                 if await bot._check_and_consume_shield(target.id):
                     await interaction.response.send_message(
@@ -351,8 +353,6 @@ class AbilityCommands:
                             (target.id, interaction.user.id, curse_amount)
                         )
                         await conn.commit()
-
-                await bot.ability_manager.use_ability(interaction.user.id, 'curse')
 
                 target_partner_id = await bot.pact_manager.get_active_pact_partner(target.id)
                 if target_partner_id:
@@ -605,6 +605,9 @@ class AbilityCommands:
                                 )
                                 return
                 
+                # Mark ability as used before shield check
+                await bot.ability_manager.use_ability(interaction.user.id, 'entomb')
+
                 # Check leader's shield
                 if await bot._check_and_consume_shield(leader_id):
                     try:
@@ -647,9 +650,6 @@ class AbilityCommands:
                             (leader_id, curse_until, curse_until)
                         )
                         await conn.commit()
-
-                # Mark ability as used
-                await bot.ability_manager.use_ability(interaction.user.id, 'entomb')
 
                 # Mirror entomb to leader's pact partner if any
                 leader_partner_id = await bot.pact_manager.get_active_pact_partner(leader_id)
@@ -962,6 +962,8 @@ class AbilityCommands:
 
                 amount = random.randint(5, 10)
 
+                await bot.ability_manager.use_ability(interaction.user.id, 'steal')
+
                 # Check target's shield — blocks the entire steal
                 if await bot._check_and_consume_shield(target.id):
                     await interaction.response.send_message(
@@ -995,8 +997,6 @@ class AbilityCommands:
                             (target.id, interaction.user.id, amount)
                         )
                         await conn.commit()
-
-                await bot.ability_manager.use_ability(interaction.user.id, 'steal')
 
                 # Mirror steal_bonus to thief's pact partner
                 thief_partner_id = await bot.pact_manager.get_active_pact_partner(interaction.user.id)
@@ -1127,6 +1127,8 @@ class AbilityCommands:
                     )
                     return
 
+                await bot.ability_manager.use_ability(interaction.user.id, 'sacrifice')
+
                 # Check target's shield
                 if await bot._check_and_consume_shield(target.id):
                     await interaction.response.send_message(
@@ -1174,8 +1176,6 @@ class AbilityCommands:
                             (interaction.user.id, target.id, expires_at)
                         )
                         await conn.commit()
-
-                await bot.ability_manager.use_ability(interaction.user.id, 'sacrifice')
 
                 # Notify victim via DM
                 try:
